@@ -102,7 +102,7 @@ function settingsFor(chatId: ChatId): SessionSettings {
     model: config.agy.model || null, effort: config.agy.effort, mode: config.agy.mode, sandbox: config.agy.sandbox,
     agent: config.agy.agent || null, project: config.agy.project || null, addDirs: [], continueSession: false,
     newProject: false, disableSlashCommands: false, jsonSchema: null, logFile: null, outputFormat: "stream-json",
-    printTimeout: null, dangerouslySkipPermissions: config.agy.allowDangerouslySkipPermissions, verbose: config.telegram.verbose || "detailed",
+    printTimeout: null, verbose: config.telegram.verbose || "detailed",
   };
   const stored = state.session(chatId)?.settings || {};
   const settings: SessionSettings = {
@@ -777,6 +777,10 @@ async function handleCommand(message: TelegramMessage, command: string, args: st
     return true;
   }
   if (["/restart", "/restart_bot", "/restart-bot", "/reboot"].includes(command)) {
+    if (!config.telegram.allowBotUpdate) {
+      await reply(chatId, "⚠️ Bot restart via Telegram is disabled.\n\nTo enable, set ALLOW_BOT_UPDATE=true in your environment.", createMainKeyboard(settingsFor(chatId)));
+      return true;
+    }
     const noticePath = path.join(path.dirname(config.stateFile), "pending_restart_notice.json");
     await fs.writeFile(noticePath, JSON.stringify({
       chatId: String(chatId),
@@ -1031,8 +1035,6 @@ async function handleCommand(message: TelegramMessage, command: string, args: st
       ? `/learn ${args.join(" ")}`
       : "Please analyze our recent conversation and derive persistent rules or skills using /learn.";
     enqueueJob(chatId, { prompt: promptText, kind: "prompt" });
-    return true;
-  }
     return true;
   }
   if (command === "/agy-confirm") { const pending = pendingDangerousCommands.get(String(chatId)); if (!pending) await reply(chatId, "There is no pending dangerous AGY command.", createMainKeyboard(settingsFor(chatId))); else await runCustomAgy(chatId, pending, true); return true; }
@@ -1529,14 +1531,14 @@ async function main(): Promise<void> {
       if (notice.reason === "update") {
         await telegram.sendMessage(
           notice.chatId,
-          `🟢 <b>Bot wieder online!</b>\n\nUpdate auf <code>${escapeHtml(notice.commit || "latest")}</code> erfolgreich abgeschlossen.`,
+          `🟢 <b>Bot is back online!</b>\n\nUpdate to <code>${escapeHtml(notice.commit || "latest")}</code> completed successfully.`,
           createMainKeyboard(settingsFor(notice.chatId)),
           "HTML"
         ).catch(() => undefined);
       } else {
         await telegram.sendMessage(
           notice.chatId,
-          `🟢 <b>AGY Gateway online!</b>\n\nService erfolgreich neu gestartet und einsatzbereit.`,
+          `🟢 <b>AGY Gateway online!</b>\n\nService restarted successfully and ready to use.`,
           createMainKeyboard(settingsFor(notice.chatId)),
           "HTML"
         ).catch(() => undefined);
@@ -1551,10 +1553,10 @@ async function main(): Promise<void> {
   if (Object.keys(interrupted).length > 0) {
     await state.clearAllInFlight();
     for (const [chatId, job] of Object.entries(interrupted)) {
-      const promptSnippet = job.prompt ? ` (Letzter Prompt: <i>"${escapeHtml(job.prompt.slice(0, 50))}${job.prompt.length > 50 ? "..." : ""}"</i>)` : "";
+      const promptSnippet = job.prompt ? ` (Last prompt: <i>"${escapeHtml(job.prompt.slice(0, 50))}${job.prompt.length > 50 ? "..." : ""}"</i>)` : "";
       await telegram.sendMessage(
         chatId,
-        `⚡ <b>AGY Gateway neu gestartet</b>\n\nDer Service wurde während der vorherigen Anfrage neu gestartet${promptSnippet}.\nIch bin wieder online und bereit für deinen nächsten Befehl!`,
+        `⚡ <b>AGY Gateway restarted</b>\n\nThe service was restarted during your previous request${promptSnippet}.\nI am back online and ready for your next command!`,
         createMainKeyboard(settingsFor(chatId)),
         "HTML"
       ).catch(() => undefined);
