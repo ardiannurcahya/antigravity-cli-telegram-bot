@@ -495,14 +495,16 @@ function parseMarkdownTableCells(line: string): string[] {
 }
 
 function cleanCellText(cell: string): string {
-  return cell
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/__([^_]+)__/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/_([^_]+)_/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .trim();
+  return sanitizeLatexExpressions(
+    cell
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/_([^_]+)_/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .trim()
+  );
 }
 
 function formatMarkdownTable(tableLines: string[]): string | null {
@@ -571,6 +573,190 @@ function stripHtmlTags(value: string): string {
   return value.replace(/<[^>]*>/g, "");
 }
 
+const GREEK_MAP: Record<string, string> = {
+  alpha: "α", beta: "β", gamma: "γ", Gamma: "Γ",
+  delta: "δ", Delta: "Δ", epsilon: "ε", varepsilon: "ε",
+  zeta: "ζ", eta: "η", theta: "θ", vartheta: "θ", Theta: "Θ",
+  iota: "ι", kappa: "κ", lambda: "λ", Lambda: "Λ",
+  mu: "µ", nu: "ν", xi: "ξ", Xi: "Ξ",
+  pi: "π", Pi: "Π", rho: "ρ", sigma: "σ", Sigma: "Σ",
+  tau: "τ", upsilon: "υ", phi: "φ", varphi: "φ", Phi: "Φ",
+  chi: "χ", psi: "ψ", Psi: "Ψ", omega: "ω", Omega: "Ω",
+};
+
+const SYMBOL_MAP: Record<string, string> = {
+  rightarrow: "→", to: "→", longrightarrow: "⟶",
+  leftarrow: "←", gets: "←", longleftarrow: "⟵",
+  Rightarrow: "⇒", Leftarrow: "⇐",
+  leftrightarrow: "↔", Leftrightarrow: "⇔", iff: "⇔",
+  uparrow: "↑", downarrow: "↓", mapsto: "↦",
+  approx: "≈", sim: "∼", simeq: "≃", cong: "≅",
+  neq: "≠", ne: "≠",
+  le: "≤", leq: "≤", ge: "≥", geq: "≥",
+  ll: "≪", gg: "≫",
+  pm: "±", mp: "∓",
+  times: "×", cdot: "·", div: "÷",
+  circ: "°", degree: "°",
+  infty: "∞",
+  in: "∈", notin: "∉", ni: "∋",
+  subset: "⊂", supset: "⊃", subseteq: "⊆", supseteq: "⊇",
+  cup: "∪", cap: "∩",
+  forall: "∀", exists: "∃", nexists: "∄",
+  nabla: "∇", partial: "∂",
+  sum: "∑", prod: "∏", int: "∫",
+  ldots: "…", cdots: "…", dots: "…",
+};
+
+const SUPERSCRIPT_MAP: Record<string, string> = {
+  "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+  "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
+  "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
+  n: "ⁿ", i: "ⁱ",
+};
+
+const SUBSCRIPT_MAP: Record<string, string> = {
+  "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
+  "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
+  "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
+  a: "ₐ", e: "ₑ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ",
+  l: "ₗ", m: "ₘ", n: "ₙ", o: "ₒ", p: "ₚ", r: "ᵣ",
+  s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", x: "ₓ",
+};
+
+function toSuperscript(str: string): string {
+  return str.split("").map((ch) => SUPERSCRIPT_MAP[ch] || ch).join("");
+}
+
+function toSubscript(str: string): string {
+  return str.split("").map((ch) => SUBSCRIPT_MAP[ch] || ch).join("");
+}
+
+function extractBracedArg(text: string, startIndex: number): { content: string; endIndex: number } | null {
+  if (text[startIndex] !== "{") return null;
+  let depth = 0;
+  const start = startIndex + 1;
+  for (let i = startIndex; i < text.length; i++) {
+    if (text[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        return { content: text.slice(start, i), endIndex: i };
+      }
+    }
+  }
+  return null;
+}
+
+function replaceFractions(text: string): string {
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text.startsWith("\\frac", i)) {
+      const firstBraceIdx = i + 5;
+      const num = extractBracedArg(text, firstBraceIdx);
+      if (num) {
+        const secondBraceIdx = num.endIndex + 1;
+        const den = extractBracedArg(text, secondBraceIdx);
+        if (den) {
+          result += `(${cleanLatexMath(num.content)})/(${cleanLatexMath(den.content)})`;
+          i = den.endIndex + 1;
+          continue;
+        }
+      }
+    }
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
+export function cleanLatexMath(expr: string): string {
+  let res = expr;
+  res = replaceFractions(res);
+
+  while (res.includes("\\sqrt")) {
+    const idx = res.indexOf("\\sqrt");
+    const braced = extractBracedArg(res, idx + 5);
+    if (braced) {
+      const inner = cleanLatexMath(braced.content);
+      res = res.slice(0, idx) + `√(${inner})` + res.slice(braced.endIndex + 1);
+    } else {
+      break;
+    }
+  }
+
+  while (/\\(?:text|mathrm|mathbf|textbf|mathit|textit|operatorname)\{/.test(res)) {
+    const match = res.match(/\\(?:text|mathrm|mathbf|textbf|mathit|textit|operatorname)\{/);
+    if (!match || match.index === undefined) break;
+    const startIdx = match.index + match[0].length - 1;
+    const braced = extractBracedArg(res, startIdx);
+    if (braced) {
+      res = res.slice(0, match.index) + braced.content + res.slice(braced.endIndex + 1);
+    } else {
+      break;
+    }
+  }
+
+  res = res.replace(/\{,\}/g, ",");
+  res = res.replace(/\\([%$_{}#])/g, "$1");
+  res = res.replace(/\\&amp;/g, "&amp;");
+  res = res.replace(/\\&/g, "&amp;");
+  res = res.replace(/\\[,;: ]/g, " ");
+  res = res.replace(/\\!/g, "");
+  res = res.replace(/\\q?quad/g, "  ");
+
+  res = res.replace(/\^\{([^{}]+)\}/g, (_, exp: string) => toSuperscript(exp));
+  res = res.replace(/\_\{([^{}]+)\}/g, (_, sub: string) => toSubscript(sub));
+  res = res.replace(/\^([0-9+-ni])/g, (_, exp: string) => toSuperscript(exp));
+  res = res.replace(/\_([0-9+-aeh-pr-tv-x])/g, (_, sub: string) => toSubscript(sub));
+
+  res = res.replace(/\\([a-zA-Z]+)/g, (_match, name: string) => {
+    if (SYMBOL_MAP[name]) return SYMBOL_MAP[name];
+    if (GREEK_MAP[name]) return GREEK_MAP[name];
+    return name;
+  });
+
+  res = res.replace(/\{([^{}]+)\}/g, "$1");
+
+  return res.trim().replace(/\s{2,}/g, " ");
+}
+
+export function sanitizeLatexExpressions(text: string): string {
+  let result = text;
+
+  // Block math: $$ ... $$ or \[ ... \]
+  result = result.replace(/\$\$([\s\S]+?)\$\$/g, (_, inner: string) => cleanLatexMath(inner));
+  result = result.replace(/\\\[([\s\S]+?)\\\]/g, (_, inner: string) => cleanLatexMath(inner));
+
+  // Inline math: \( ... \)
+  result = result.replace(/\\\(([\s\S]+?)\\\)/g, (_, inner: string) => cleanLatexMath(inner));
+
+  // Inline math: $ ... $
+  result = result.replace(/\$([^\$\n]+?)\$/g, (match, inner: string) => {
+    const trimmed = inner.trim();
+    if (!trimmed) return match;
+    if (
+      /\\[a-zA-Z,;:! %$_{}#&]/.test(trimmed) ||
+      /[\^_{}]/.test(trimmed) ||
+      /[=<>≤≥≈≠±×·÷]/.test(trimmed) ||
+      /^[a-zA-Z]$/.test(trimmed) ||
+      /^[0-9.,\s+\-*\/()]+[+\-*\/][0-9.,\s+\-*\/()]+$/.test(trimmed)
+    ) {
+      return cleanLatexMath(inner);
+    }
+    return match;
+  });
+
+  // Also clean loose LaTeX symbols outside delimiters (e.g. \rightarrow, \approx, \text{...})
+  result = cleanLatexMath(result);
+
+  return result;
+}
+
 function formatInlineHtml(value: string): string {
   const tokens: string[] = [];
   const token = (html: string): string => {
@@ -600,6 +786,10 @@ function formatInlineHtml(value: string): string {
     return token(`<code>${cleanLabel}</code>`);
   });
   escaped = escaped.replace(/`([^`\n]+)`/g, (_match, code: string) => token(`<code>${code}</code>`));
+
+  // Sanitize LaTeX math and TeX macros in regular text outside code blocks & links
+  escaped = sanitizeLatexExpressions(escaped);
+
   escaped = escaped.replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_match, boldA: string | undefined, boldB: string | undefined) => `<b>${boldA || boldB}</b>`);
   escaped = escaped.replace(/~~(.+?)~~/g, "<s>$1</s>");
   escaped = escaped.replace(/\*([^*\n]+)\*|_([^_\n]+)_/g, (_match, italicA: string | undefined, italicB: string | undefined) => `<i>${italicA || italicB}</i>`);

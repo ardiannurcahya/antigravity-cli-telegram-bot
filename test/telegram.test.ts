@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { escapeHtml, executeWithRetry, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, isRetryableNetworkError, splitMessage, splitPreformattedHtml, TelegramApiError, TelegramClient } from "../src/telegram.js";
+import { cleanLatexMath, escapeHtml, executeWithRetry, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, isRetryableNetworkError, sanitizeLatexExpressions, splitMessage, splitPreformattedHtml, TelegramApiError, TelegramClient } from "../src/telegram.js";
 import { createMainKeyboard } from "../src/keyboards.js";
 
 test("splitPreformattedHtml preserves HTML tags without double escaping", () => {
@@ -221,3 +221,42 @@ test("executeWithRetry aborts immediately if AbortSignal is cancelled", async ()
   }, /Request cancelled/);
   assert.equal(attempts, 0);
 });
+
+test("cleanLatexMath converts common LaTeX expressions, symbols, and formatting into clean Unicode text", () => {
+  assert.equal(cleanLatexMath("22\\,\\%"), "22 %");
+  assert.equal(cleanLatexMath("69{,}5\\,\\text{h}"), "69,5 h");
+  assert.equal(cleanLatexMath("0{,}316\\,\\%"), "0,316 %");
+  assert.equal(cleanLatexMath("\\rightarrow"), "→");
+  assert.equal(cleanLatexMath("\\approx 15\\,\\text{km}"), "≈ 15 km");
+  assert.equal(cleanLatexMath("E = mc^2"), "E = mc²");
+  assert.equal(cleanLatexMath("\\frac{a + b}{c}"), "(a + b)/(c)");
+  assert.equal(cleanLatexMath("\\sqrt{x^2 + y^2}"), "√(x² + y²)");
+  assert.equal(cleanLatexMath("\\alpha + \\beta \\le \\gamma"), "α + β ≤ γ");
+  assert.equal(cleanLatexMath("\\pm 5\\%"), "± 5%");
+});
+
+test("formatTelegramHtml cleans LaTeX math in LLM responses while preserving code and dollar amounts", () => {
+  const markdown = `### 2. Das 22%-Budget über ~70 Stunden
+Bei $22\\,\\%$ Restmenge über $69{,}5\\,\\text{h}$:
+* **Erlaubter Verbrauch:** maximal $0{,}316\\,\\%$ pro Stunde (bzw. $7{,}6\\,\\%$ pro Tag).
+
+| Scenario | Detail |
+| :--- | :--- |
+| **Sentry Mode** | Verbraucht ca. 5–10 % / Tag $\\rightarrow$ nach 2–3 Tagen leer. |
+
+Preis liegt bei $10 und $20.
+Inline code: \`$22\\,\\%\` und \`\\rightarrow\` bleiben unverändert.`;
+
+  const html = formatTelegramHtml(markdown);
+
+  assert.match(html, /<b>2\. Das 22%-Budget über ~70 Stunden<\/b>/);
+  assert.match(html, /Bei 22 % Restmenge über 69,5 h:/);
+  assert.match(html, /• <b>Erlaubter Verbrauch:<\/b> maximal 0,316 % pro Stunde \(bzw\. 7,6 % pro Tag\)\./);
+  assert.match(html, /Verbraucht ca\. 5–10 % \/ Tag → nach 2–3 Tagen leer\./);
+  assert.match(html, /Preis liegt bei \$10 und \$20\./);
+  assert.match(html, /<code>\$22\\,\\%<\/code>/);
+  assert.match(html, /<code>\\rightarrow<\/code>/);
+  assert.doesNotMatch(html, /Bei \$22/);
+  assert.doesNotMatch(html, /69\{,\}5/);
+});
+
