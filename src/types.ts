@@ -84,6 +84,10 @@ export interface ConversationSummary {
 
 export interface InFlightJob {
   prompt?: string;
+  kind?: "prompt" | "usage" | "credits" | "context";
+  imagePath?: string;
+  documentPath?: string;
+  documentName?: string;
   startedAt: number;
 }
 
