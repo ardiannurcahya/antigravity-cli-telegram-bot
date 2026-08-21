@@ -1468,6 +1468,10 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
       return;
     }
     if (buttonText === "🤖 Model") { await reply(message.chat.id, "Select a model:", modelKeyboard(message.chat.id)); return; }
+    if (buttonText === "📊 Quota" || buttonText === "📊 Usage / Quota" || buttonText === "📊 Usage") {
+      enqueueJob(message.chat.id, { kind: "usage" });
+      return;
+    }
     if (buttonText.startsWith("⚙ Mode:")) { const settings = settingsFor(message.chat.id); settings.mode = settings.mode === "plan" ? "accept-edits" : "plan"; await saveSettings(message.chat.id, settings); await reply(message.chat.id, `Mode changed to ${settings.mode}.`, createMainKeyboard(settings)); return; }
     if (buttonText.startsWith("📢 Verbose:") || buttonText.startsWith("📢 Verbose")) {
       const settings = settingsFor(message.chat.id);

@@ -7,10 +7,10 @@ function verboseLabel(verbose: SessionSettings["verbose"]): string {
 }
 
 /** Persistent keyboard shown immediately above Telegram's input field. */
-export function createMainKeyboard(settings: SessionSettings): ReplyKeyboardMarkup {
+export function createMainKeyboard(_settings?: SessionSettings): ReplyKeyboardMarkup {
   return {
     keyboard: [
-      ["✨ New session", "🤖 Model", `📢 Verbose: ${verboseLabel(settings.verbose)}`],
+      ["✨ New session", "🤖 Model", "📊 Quota"],
     ],
     resize_keyboard: true,
     is_persistent: true,
