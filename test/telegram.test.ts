@@ -42,7 +42,7 @@ test("formats AGY Markdown-like responses as safe Telegram HTML", () => {
   assert.doesNotMatch(html, /<script|<img/);
 });
 
-test("converts markdown tables to aligned monospace codeblocks in Telegram HTML", () => {
+test("converts markdown tables to mobile-friendly structured cards in Telegram HTML", () => {
   const markdown = `Here is a table:
 
 | Component / Service | Category | Status / Purpose |
@@ -55,9 +55,22 @@ End of table.`;
 
   const html = formatTelegramHtml(markdown);
   assert.match(html, /Here is a table:/);
-  assert.match(html, /<pre><code class="language-text">Component \/ Service\s+Category\s+Status \/ Purpose\n─+\nAPI Gateway\s+Networking\s+Entry point &amp; routing\nDatabase\s+Storage\s+State management &amp; logs\nWorker Node\s+Compute\s+Background job processor<\/code><\/pre>/);
+  assert.match(html, /🔹 <b>API Gateway<\/b>/);
+  assert.match(html, /▫️ <i>Category:<\/i> Networking/);
+  assert.match(html, /▫️ <i>Status \/ Purpose:<\/i> Entry point &amp; routing/);
   assert.match(html, /End of table\./);
-  assert.doesNotMatch(html, /\| \*\*API Gateway\*\*/);
+  assert.doesNotMatch(html, /<pre><code/);
+});
+
+test("converts 2-column markdown tables to clean key-value lists in Telegram HTML", () => {
+  const markdown = `| Key | Value |
+| :--- | :--- |
+| **CPU** | 8 Cores |
+| **RAM** | 16 GB |`;
+
+  const html = formatTelegramHtml(markdown);
+  assert.match(html, /• <b>CPU:<\/b> 8 Cores/);
+  assert.match(html, /• <b>RAM:<\/b> 16 GB/);
 });
 
 test("keeps long responses formatted while chunking under Telegram limits", () => {
@@ -114,5 +127,29 @@ test("formatTelegramHtmlChunks cleans local image markdown paths and formats cap
   assert.ok(!chunks[0].includes("/tmp/another.jpg"));
   assert.ok(chunks[0].includes("🖼 <i>Henrik mit Führerausweis</i>"));
   assert.ok(chunks[0].includes('🖼 <a href="https://example.com/chart.png">Chart</a>'));
+});
+
+test("formats blockquotes and GitHub-style alerts into native Telegram blockquotes", () => {
+  const markdown = "> [!TIP]\n> This is a helpful tip\n> with multiple lines\n\n> [!WARNING]\n> High battery temperature\n\n> Standard quoted text";
+  const html = formatTelegramHtml(markdown);
+  assert.ok(html.includes("<blockquote>💡 <b>Tip</b>\nThis is a helpful tip\nwith multiple lines</blockquote>"));
+  assert.ok(html.includes("<blockquote>⚠️ <b>Warning</b>\nHigh battery temperature</blockquote>"));
+  assert.ok(html.includes("<blockquote>Standard quoted text</blockquote>"));
+});
+
+test("formats interactive checkboxes and hierarchical nested lists", () => {
+  const markdown = "- [ ] Pending task\n- [x] Completed task\n- Top level bullet\n  - Sub bullet level 2\n    - Deep bullet level 3";
+  const html = formatTelegramHtml(markdown);
+  assert.match(html, /⬜ Pending task/);
+  assert.match(html, /✅ Completed task/);
+  assert.match(html, /• Top level bullet/);
+  assert.match(html, /  ▫️ Sub bullet level 2/);
+  assert.match(html, /    – Deep bullet level 3/);
+});
+
+test("formats markdown horizontal dividers into clean unicode dividers", () => {
+  const markdown = "Section 1\n\n---\n\nSection 2";
+  const html = formatTelegramHtml(markdown);
+  assert.match(html, /Section 1\n\n───────────────\n\nSection 2/);
 });
 

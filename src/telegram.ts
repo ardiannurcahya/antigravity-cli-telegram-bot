@@ -200,6 +200,9 @@ function renderTelegramBlocks(text: string): string[] {
         codeLines = null;
         codeLanguage = "";
       } else {
+        if (output.length > 0 && output[output.length - 1] !== "") {
+          output.push("");
+        }
         codeLines = [];
         codeLanguage = fence[1] || "";
       }
@@ -207,6 +210,51 @@ function renderTelegramBlocks(text: string): string[] {
     }
     if (codeLines) {
       codeLines.push(line);
+      continue;
+    }
+
+    // Blockquote & GitHub Alerts
+    if (line.match(/^\s*>/)) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && lines[i].match(/^\s*>/)) {
+        quoteLines.push(lines[i].replace(/^\s*>\s?/, ""));
+        i++;
+      }
+      i--; // loop will increment i
+
+      let alertHeader = "";
+      if (quoteLines.length > 0) {
+        const alertMatch = quoteLines[0].match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i);
+        if (alertMatch) {
+          const type = alertMatch[1].toUpperCase();
+          const rest = alertMatch[2];
+          const iconMap: Record<string, string> = {
+            NOTE: "ℹ️ <b>Note</b>",
+            TIP: "💡 <b>Tip</b>",
+            IMPORTANT: "📌 <b>Important</b>",
+            WARNING: "⚠️ <b>Warning</b>",
+            CAUTION: "🚨 <b>Caution</b>",
+          };
+          alertHeader = iconMap[type] || `📌 <b>${type}</b>`;
+          quoteLines.shift();
+          if (rest.trim()) {
+            quoteLines.unshift(rest.trim());
+          }
+        }
+      }
+
+      const formattedQuote = quoteLines.map((q) => formatInlineHtml(q)).join("\n");
+      const finalQuoteHtml = alertHeader
+        ? `<blockquote>${alertHeader}\n${formattedQuote}</blockquote>`
+        : `<blockquote>${formattedQuote}</blockquote>`;
+
+      if (output.length > 0 && output[output.length - 1] !== "") {
+        output.push("");
+      }
+      output.push(finalQuoteHtml);
+      if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+        output.push("");
+      }
       continue;
     }
 
@@ -220,7 +268,13 @@ function renderTelegramBlocks(text: string): string[] {
       }
       const renderedTable = formatMarkdownTable(tableLines);
       if (renderedTable) {
+        if (output.length > 0 && output[output.length - 1] !== "") {
+          output.push("");
+        }
         output.push(renderedTable);
+        if (j < lines.length && lines[j].trim() !== "") {
+          output.push("");
+        }
         i = j - 1;
         continue;
       }
@@ -228,23 +282,52 @@ function renderTelegramBlocks(text: string): string[] {
 
     const divider = line.match(/^\s*[-*_]{3,}\s*$/);
     if (divider) {
-      output.push("");
+      if (output.length > 0 && output[output.length - 1] !== "") {
+        output.push("");
+      }
+      output.push("───────────────");
+      if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+        output.push("");
+      }
       continue;
     }
 
     const heading = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
     if (heading) {
+      if (output.length > 0 && output[output.length - 1] !== "") {
+        output.push("");
+      }
       output.push(`<b>${formatInlineHtml(heading[1])}</b>`);
       continue;
     }
-    const bullet = line.match(/^\s*[-*+]\s+(.+)$/);
-    if (bullet) {
-      output.push(`• ${formatInlineHtml(bullet[1])}`);
+
+    const checkbox = line.match(/^(\s*)[-*+]\s+\[([ xX])\]\s+(.+)$/);
+    if (checkbox) {
+      const indentLevel = Math.min(3, Math.floor(checkbox[1].length / 2));
+      const indent = "  ".repeat(indentLevel);
+      const icon = checkbox[2].trim() ? "✅" : "⬜";
+      output.push(`${indent}${icon} ${formatInlineHtml(checkbox[3])}`);
       continue;
     }
+
+    const bullet = line.match(/^(\s*)[-*+]\s+(.+)$/);
+    if (bullet) {
+      const indentSpaces = bullet[1].length;
+      if (indentSpaces >= 4) {
+        output.push(`    – ${formatInlineHtml(bullet[2])}`);
+      } else if (indentSpaces >= 2) {
+        output.push(`  ▫️ ${formatInlineHtml(bullet[2])}`);
+      } else {
+        output.push(`• ${formatInlineHtml(bullet[2])}`);
+      }
+      continue;
+    }
+
     const numbered = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
     if (numbered) {
-      output.push(`${numbered[1]}. ${formatInlineHtml(numbered[2])}`);
+      const indentSpaces = numbered[1].length;
+      const indent = indentSpaces >= 2 ? "  " : "";
+      output.push(`${indent}${numbered[1]}. ${formatInlineHtml(numbered[2])}`);
       continue;
     }
     output.push(formatInlineHtml(line));
@@ -299,48 +382,51 @@ function formatMarkdownTable(tableLines: string[]): string | null {
   const rawRows = tableLines.filter((_, idx) => idx !== sepIndex).map(parseMarkdownTableCells);
   if (rawRows.length === 0) return null;
 
-  const cleanRows = rawRows.map((row) => row.map(cleanCellText));
-  const colCount = Math.max(...cleanRows.map((r) => r.length));
+  const headerRow = rawRows[0];
+  const colCount = Math.max(...rawRows.map((r) => r.length));
   if (colCount === 0) return null;
 
-  const colWidths = Array.from({ length: colCount }, (_, colIdx) =>
-    Math.max(
-      3,
-      ...cleanRows.map((row) => (row[colIdx] ? row[colIdx].length : 0))
-    )
-  );
+  const cardBlocks: string[] = [];
 
-  const formattedRows: string[] = [];
-  const headerRow = cleanRows[0];
-  const headerFormatted = colWidths
-    .map((width, colIdx) => (headerRow[colIdx] || "").padEnd(width))
-    .join("  ")
-    .trimEnd();
-  formattedRows.push(headerFormatted);
+  for (let r = 1; r < rawRows.length; r++) {
+    const row = rawRows[r];
+    if (row.every((c) => !c.trim())) continue;
 
-  const totalWidth = colWidths.reduce((sum, w) => sum + w, 0) + (colCount - 1) * 2;
-  formattedRows.push("─".repeat(Math.max(totalWidth, 10)));
-
-  for (let r = 1; r < cleanRows.length; r++) {
-    const row = cleanRows[r];
-    if (row.every((c) => !c)) continue;
-    const rowFormatted = colWidths
-      .map((width, colIdx) => (row[colIdx] || "").padEnd(width))
-      .join("  ")
-      .trimEnd();
-    formattedRows.push(rowFormatted);
+    if (colCount === 2) {
+      const key = formatInlineHtml(cleanCellText(row[0] || ""));
+      const val = formatInlineHtml(row[1] || "");
+      cardBlocks.push(`• <b>${key}:</b> ${val}`);
+    } else {
+      const primaryTitle = formatInlineHtml(cleanCellText(row[0] || (headerRow[0] ? `${headerRow[0]} ${r}` : `Item ${r}`)));
+      const lines: string[] = [`🔹 <b>${primaryTitle}</b>`];
+      for (let c = 1; c < colCount; c++) {
+        const colHeader = formatInlineHtml(cleanCellText(headerRow[c] || `Field ${c + 1}`));
+        const cellVal = formatInlineHtml(row[c] || "—");
+        lines.push(`  ▫️ <i>${colHeader}:</i> ${cellVal}`);
+      }
+      cardBlocks.push(lines.join("\n"));
+    }
   }
 
-  return `<pre><code class="language-text">${escapeHtml(formattedRows.join("\n"))}</code></pre>`;
+  return cardBlocks.join("\n\n");
 }
 
 function splitOversizedHtmlBlock(block: string, maxChars: number): string[] {
   const code = block.match(/^<pre><code( class="[^"]+")?>([\s\S]*)<\/code><\/pre>$/);
-  if (!code) return splitMessage(stripHtmlTags(block), maxChars).map(escapeHtml);
-  const open = `<pre><code${code[1] || ""}>`;
-  const close = "</code></pre>";
-  const contentLimit = Math.max(1, maxChars - open.length - close.length);
-  return splitMessage(code[2], contentLimit).map((part) => `${open}${part}${close}`);
+  if (code) {
+    const open = `<pre><code${code[1] || ""}>`;
+    const close = "</code></pre>";
+    const contentLimit = Math.max(1, maxChars - open.length - close.length);
+    return splitMessage(code[2], contentLimit).map((part) => `${open}${part}${close}`);
+  }
+  const quote = block.match(/^<blockquote>([\s\S]*)<\/blockquote>$/);
+  if (quote) {
+    const open = "<blockquote>";
+    const close = "</blockquote>";
+    const contentLimit = Math.max(1, maxChars - open.length - close.length);
+    return splitMessage(quote[1], contentLimit).map((part) => `${open}${part}${close}`);
+  }
+  return splitMessage(stripHtmlTags(block), maxChars).map(escapeHtml);
 }
 
 function stripHtmlTags(value: string): string {
