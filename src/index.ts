@@ -1037,6 +1037,13 @@ async function handleCommand(message: TelegramMessage, command: string, args: st
     enqueueJob(chatId, { prompt: promptText, kind: "prompt" });
     return true;
   }
+  if (command === "/compact") {
+    const promptText = args.length > 0
+      ? `Please compact the conversation context: ${args.join(" ")}`
+      : "Please compact our conversation context by consolidating vital state, active goals, decisions, and modified files internally, discarding temporary logs, and providing a concise token savings summary.";
+    enqueueJob(chatId, { prompt: promptText, kind: "prompt" });
+    return true;
+  }
   if (command === "/agy-confirm") { const pending = pendingDangerousCommands.get(String(chatId)); if (!pending) await reply(chatId, "There is no pending dangerous AGY command.", createMainKeyboard(settingsFor(chatId))); else await runCustomAgy(chatId, pending, true); return true; }
   return false;
 }
@@ -1510,6 +1517,7 @@ async function main(): Promise<void> {
     { command: "verbose", description: "Show or change verbose level (detailed, compact, silent)" },
     { command: "session", description: "Show session settings" },
     { command: "learn", description: "Learn reusable rules/skills from recent chat" },
+    { command: "compact", description: "Compact context and create state snapshot to save tokens" },
     { command: "help", description: "Show available commands" },
     { command: "agents", description: "List available AGY agents" },
     { command: "agent", description: "Select an AGY agent" },
