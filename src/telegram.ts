@@ -6,14 +6,126 @@ import type { ChatId, InlineKeyboardMarkup, ReplyMarkup, TelegramUpdate } from "
 const API_ROOT = (token: string): string => `https://api.telegram.org/bot${token}`;
 export type TelegramParseMode = "HTML";
 
+export class TelegramApiError extends Error {
+  public constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly retryAfter?: number
+  ) {
+    super(message);
+    this.name = "TelegramApiError";
+  }
+}
+
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("Request cancelled"));
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error("Request cancelled"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export function isRetryableNetworkError(error: unknown): boolean {
+  if (!error) return false;
+  if (error instanceof TelegramApiError) {
+    if (error.statusCode === 429) return true;
+    if (error.statusCode && error.statusCode >= 500 && error.statusCode <= 599) return true;
+    return false;
+  }
+  if (error instanceof Error) {
+    if (error.name === "AbortError") return false;
+    const msg = error.message.toLowerCase();
+    if (
+      msg.includes("fetch failed") ||
+      msg.includes("econnreset") ||
+      msg.includes("econnrefused") ||
+      msg.includes("etimedout") ||
+      msg.includes("enotfound") ||
+      msg.includes("ehostunreach") ||
+      msg.includes("enetunreach") ||
+      msg.includes("eai_again") ||
+      msg.includes("socket hang up") ||
+      msg.includes("timeout") ||
+      msg.includes("und_err")
+    ) {
+      return true;
+    }
+    if (error.name === "TypeError" && msg.includes("fetch")) return true;
+  }
+  return false;
+}
+
+export interface RetryOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  signal?: AbortSignal;
+}
+
+export async function executeWithRetry<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 3;
+  const initialDelayMs = options.initialDelayMs ?? 500;
+  const maxDelayMs = options.maxDelayMs ?? 5000;
+  const signal = options.signal;
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    if (signal?.aborted) {
+      throw new Error("Request cancelled");
+    }
+
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (signal?.aborted) {
+        throw error;
+      }
+
+      if (attempt === maxRetries || !isRetryableNetworkError(error)) {
+        throw error;
+      }
+
+      let delayMs = Math.min(maxDelayMs, initialDelayMs * 2 ** attempt) + Math.floor(Math.random() * 150);
+      if (error instanceof TelegramApiError && typeof error.retryAfter === "number" && error.retryAfter > 0) {
+        delayMs = Math.min(maxDelayMs, error.retryAfter * 1000);
+      }
+
+      await sleep(delayMs, signal);
+    }
+  }
+
+  throw lastError;
+}
+
 export class TelegramClient {
   private readonly root: string;
   public constructor(private readonly token: string) { this.root = API_ROOT(token); }
   public async call<T>(method: string, payload: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-    const response = await fetch(`${this.root}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal });
-    const body = await response.json() as { ok: boolean; result?: T; description?: string };
-    if (!response.ok || !body.ok) throw new Error(`Telegram ${method} failed: ${body.description || response.status}`);
-    return body.result as T;
+    return executeWithRetry(async () => {
+      const response = await fetch(`${this.root}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal });
+      const body = await response.json() as { ok: boolean; result?: T; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+      if (!response.ok || !body.ok) {
+        throw new TelegramApiError(
+          `Telegram ${method} failed: ${body.description || response.status}`,
+          body.error_code || response.status,
+          body.parameters?.retry_after
+        );
+      }
+      return body.result as T;
+    }, { signal });
   }
   public getUpdates(offset: number, signal?: AbortSignal): Promise<TelegramUpdate[]> { return this.call("getUpdates", { offset, timeout: 30, allowed_updates: ["message", "callback_query"] }, signal); }
   public sendMessage(chatId: ChatId, text: string, replyMarkup?: ReplyMarkup, parseMode?: TelegramParseMode): Promise<{ message_id: number }> {
@@ -49,66 +161,92 @@ export class TelegramClient {
   public answerCallbackQuery(callbackQueryId: string, text?: string): Promise<boolean> { return this.call<boolean>("answerCallbackQuery", { callback_query_id: callbackQueryId, ...(text ? { text } : {}) }); }
   public setMyCommands(commands: Array<{ command: string; description: string }>): Promise<boolean> { return this.call<boolean>("setMyCommands", { commands }); }
   public sendChatAction(chatId: ChatId, action = "typing"): Promise<boolean> { return this.call<boolean>("sendChatAction", { chat_id: chatId, action }); }
-  public async sendDocument(chatId: ChatId, filename: string, content: string): Promise<unknown> {
-    const form = new FormData(); form.append("chat_id", String(chatId)); form.append("document", new Blob([content], { type: "text/markdown" }), filename);
-    const response = await fetch(`${this.root}/sendDocument`, { method: "POST", body: form });
-    const body = await response.json() as { ok: boolean; result?: unknown; description?: string };
-    if (!response.ok || !body.ok) throw new Error(`Telegram sendDocument failed: ${body.description || response.status}`);
-    return body.result;
+  public async sendDocument(chatId: ChatId, filename: string, content: string, signal?: AbortSignal): Promise<unknown> {
+    return executeWithRetry(async () => {
+      const form = new FormData(); form.append("chat_id", String(chatId)); form.append("document", new Blob([content], { type: "text/markdown" }), filename);
+      const response = await fetch(`${this.root}/sendDocument`, { method: "POST", body: form, signal });
+      const body = await response.json() as { ok: boolean; result?: unknown; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+      if (!response.ok || !body.ok) {
+        throw new TelegramApiError(
+          `Telegram sendDocument failed: ${body.description || response.status}`,
+          body.error_code || response.status,
+          body.parameters?.retry_after
+        );
+      }
+      return body.result;
+    }, { signal });
   }
-  public async sendPhoto(chatId: ChatId, photoPath: string | Buffer, caption?: string, parseMode?: TelegramParseMode, mimeType?: string, replyMarkup?: ReplyMarkup): Promise<unknown> {
-    const form = new FormData();
-    form.append("chat_id", String(chatId));
-    if (typeof photoPath === "string") {
-      const fileBuffer = await fs.readFile(photoPath);
-      const filename = path.basename(photoPath);
-      const ext = path.extname(photoPath).toLowerCase();
-      const detectedMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-      form.append("photo", new Blob([new Uint8Array(fileBuffer)], { type: detectedMime }), filename);
-    } else {
-      const mime = mimeType || "image/png";
-      form.append("photo", new Blob([new Uint8Array(photoPath)], { type: mime }), `image.${mime.split("/")[1] || "png"}`);
-    }
-    if (caption) {
-      form.append("caption", caption.slice(0, 1024));
-      if (parseMode) form.append("parse_mode", parseMode);
-    }
-    if (replyMarkup) {
-      form.append("reply_markup", JSON.stringify(replyMarkup));
-    }
-    const response = await fetch(`${this.root}/sendPhoto`, { method: "POST", body: form });
-    const body = await response.json() as { ok: boolean; result?: unknown; description?: string };
-    if (!response.ok || !body.ok) throw new Error(`Telegram sendPhoto failed: ${body.description || response.status}`);
-    return body.result;
+  public async sendPhoto(chatId: ChatId, photoPath: string | Buffer, caption?: string, parseMode?: TelegramParseMode, mimeType?: string, replyMarkup?: ReplyMarkup, signal?: AbortSignal): Promise<unknown> {
+    return executeWithRetry(async () => {
+      const form = new FormData();
+      form.append("chat_id", String(chatId));
+      if (typeof photoPath === "string") {
+        const fileBuffer = await fs.readFile(photoPath);
+        const filename = path.basename(photoPath);
+        const ext = path.extname(photoPath).toLowerCase();
+        const detectedMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        form.append("photo", new Blob([new Uint8Array(fileBuffer)], { type: detectedMime }), filename);
+      } else {
+        const mime = mimeType || "image/png";
+        form.append("photo", new Blob([new Uint8Array(photoPath)], { type: mime }), `image.${mime.split("/")[1] || "png"}`);
+      }
+      if (caption) {
+        form.append("caption", caption.slice(0, 1024));
+        if (parseMode) form.append("parse_mode", parseMode);
+      }
+      if (replyMarkup) {
+        form.append("reply_markup", JSON.stringify(replyMarkup));
+      }
+      const response = await fetch(`${this.root}/sendPhoto`, { method: "POST", body: form, signal });
+      const body = await response.json() as { ok: boolean; result?: unknown; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+      if (!response.ok || !body.ok) {
+        throw new TelegramApiError(
+          `Telegram sendPhoto failed: ${body.description || response.status}`,
+          body.error_code || response.status,
+          body.parameters?.retry_after
+        );
+      }
+      return body.result;
+    }, { signal });
   }
-  public async sendDocumentFile(chatId: ChatId, filePath: string, caption?: string, replyMarkup?: ReplyMarkup): Promise<unknown> {
-    const fileBuffer = await fs.readFile(filePath);
-    const form = new FormData();
-    form.append("chat_id", String(chatId));
-    form.append("document", new Blob([fileBuffer]), path.basename(filePath));
-    if (caption) {
-      form.append("caption", caption.slice(0, 1024));
-      form.append("parse_mode", "HTML");
-    }
-    if (replyMarkup) {
-      form.append("reply_markup", JSON.stringify(replyMarkup));
-    }
-    const response = await fetch(`${this.root}/sendDocument`, { method: "POST", body: form });
-    const body = await response.json() as { ok: boolean; result?: unknown; description?: string };
-    if (!response.ok || !body.ok) throw new Error(`Telegram sendDocument failed: ${body.description || response.status}`);
-    return body.result;
+  public async sendDocumentFile(chatId: ChatId, filePath: string, caption?: string, replyMarkup?: ReplyMarkup, signal?: AbortSignal): Promise<unknown> {
+    return executeWithRetry(async () => {
+      const fileBuffer = await fs.readFile(filePath);
+      const form = new FormData();
+      form.append("chat_id", String(chatId));
+      form.append("document", new Blob([new Uint8Array(fileBuffer)]), path.basename(filePath));
+      if (caption) {
+        form.append("caption", caption.slice(0, 1024));
+        form.append("parse_mode", "HTML");
+      }
+      if (replyMarkup) {
+        form.append("reply_markup", JSON.stringify(replyMarkup));
+      }
+      const response = await fetch(`${this.root}/sendDocument`, { method: "POST", body: form, signal });
+      const body = await response.json() as { ok: boolean; result?: unknown; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+      if (!response.ok || !body.ok) {
+        throw new TelegramApiError(
+          `Telegram sendDocument failed: ${body.description || response.status}`,
+          body.error_code || response.status,
+          body.parameters?.retry_after
+        );
+      }
+      return body.result;
+    }, { signal });
   }
   public getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }> {
     return this.call("getFile", { file_id: fileId });
   }
-  public async downloadFile(filePath: string, destination: string): Promise<string> {
-    const fileUrl = `https://api.telegram.org/file/bot${this.token}/${filePath}`;
-    const response = await fetch(fileUrl);
-    if (!response.ok) throw new Error(`Download file failed: ${response.statusText}`);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, buffer);
-    return destination;
+  public async downloadFile(filePath: string, destination: string, signal?: AbortSignal): Promise<string> {
+    return executeWithRetry(async () => {
+      const fileUrl = `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+      const response = await fetch(fileUrl, { signal });
+      if (!response.ok) throw new TelegramApiError(`Download file failed: ${response.statusText}`, response.status);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.writeFile(destination, buffer);
+      return destination;
+    }, { signal });
   }
 }
 

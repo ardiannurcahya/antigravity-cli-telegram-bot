@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { escapeHtml, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, splitMessage, splitPreformattedHtml } from "../src/telegram.js";
+import { escapeHtml, executeWithRetry, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, isRetryableNetworkError, splitMessage, splitPreformattedHtml, TelegramApiError, TelegramClient } from "../src/telegram.js";
 import { createMainKeyboard } from "../src/keyboards.js";
 
 test("splitPreformattedHtml preserves HTML tags without double escaping", () => {
@@ -115,4 +115,79 @@ test("formatTelegramHtmlChunks cleans local image markdown paths and formats cap
   assert.ok(chunks[0].includes("🖼 <i>Henrik mit Führerausweis</i>"));
   assert.ok(chunks[0].includes('🖼 <a href="https://example.com/chart.png">Chart</a>'));
 });
+
+test("isRetryableNetworkError identifies transient network failures and 5xx / 429 errors", () => {
+  assert.equal(isRetryableNetworkError(new TypeError("fetch failed")), true);
+  assert.equal(isRetryableNetworkError(new Error("read ECONNRESET")), true);
+  assert.equal(isRetryableNetworkError(new Error("connect ETIMEDOUT")), true);
+  assert.equal(isRetryableNetworkError(new Error("getaddrinfo ENOTFOUND api.telegram.org")), true);
+  assert.equal(isRetryableNetworkError(new Error("socket hang up")), true);
+  assert.equal(isRetryableNetworkError(new TelegramApiError("Bad Gateway", 502)), true);
+  assert.equal(isRetryableNetworkError(new TelegramApiError("Gateway Timeout", 504)), true);
+  assert.equal(isRetryableNetworkError(new TelegramApiError("Too Many Requests", 429, 5)), true);
+
+  // Non-retryable
+  assert.equal(isRetryableNetworkError(new TelegramApiError("Bad Request: chat not found", 400)), false);
+  assert.equal(isRetryableNetworkError(new TelegramApiError("Forbidden: bot was blocked by the user", 403)), false);
+  assert.equal(isRetryableNetworkError(new Error("Something arbitrary")), false);
+});
+
+test("executeWithRetry succeeds on first attempt without retrying", async () => {
+  let attempts = 0;
+  const result = await executeWithRetry(async () => {
+    attempts += 1;
+    return "success";
+  }, { initialDelayMs: 5 });
+  assert.equal(result, "success");
+  assert.equal(attempts, 1);
+});
+
+test("executeWithRetry retries on transient network error (fetch failed) and succeeds", async () => {
+  let attempts = 0;
+  const result = await executeWithRetry(async () => {
+    attempts += 1;
+    if (attempts < 3) {
+      throw new TypeError("fetch failed");
+    }
+    return "recovered";
+  }, { maxRetries: 3, initialDelayMs: 5 });
+  assert.equal(result, "recovered");
+  assert.equal(attempts, 3);
+});
+
+test("executeWithRetry throws immediately on non-retryable error without retrying", async () => {
+  let attempts = 0;
+  await assert.rejects(async () => {
+    await executeWithRetry(async () => {
+      attempts += 1;
+      throw new TelegramApiError("Bad Request: message is not modified", 400);
+    }, { maxRetries: 3, initialDelayMs: 5 });
+  }, /message is not modified/);
+  assert.equal(attempts, 1);
+});
+
+test("executeWithRetry stops after maxRetries if network error persists", async () => {
+  let attempts = 0;
+  await assert.rejects(async () => {
+    await executeWithRetry(async () => {
+      attempts += 1;
+      throw new TypeError("fetch failed");
+    }, { maxRetries: 2, initialDelayMs: 5 });
+  }, /fetch failed/);
+  assert.equal(attempts, 3); // initial attempt + 2 retries
+});
+
+test("executeWithRetry aborts immediately if AbortSignal is cancelled", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let attempts = 0;
+  await assert.rejects(async () => {
+    await executeWithRetry(async () => {
+      attempts += 1;
+      return "done";
+    }, { signal: controller.signal, initialDelayMs: 5 });
+  }, /Request cancelled/);
+  assert.equal(attempts, 0);
+});
+
 
