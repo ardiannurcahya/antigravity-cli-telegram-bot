@@ -89,14 +89,9 @@ export function parseUsageQuota(rawOutput: string): string {
 
   const hasGeminiLimits = Boolean(gemini.weekly || gemini.fiveHour);
   const hasClaudeLimits = Boolean(claude.weekly || claude.fiveHour);
-  const isSharedPool =
-    hasGeminiLimits &&
-    hasClaudeLimits &&
-    gemini.weekly === claude.weekly &&
-    gemini.fiveHour === claude.fiveHour;
 
-  if (isSharedPool) {
-    lines.push("<b>Antigravity Quota (All Models)</b>");
+  if (hasGeminiLimits) {
+    lines.push("<b>Gemini Models</b>");
     if (gemini.weekly) {
       lines.push(
         `• Weekly Limit: <b>${gemini.weekly}</b>${gemini.weeklyRefresh ? ` (Refreshes in ${gemini.weeklyRefresh})` : ""}`
@@ -107,32 +102,35 @@ export function parseUsageQuota(rawOutput: string): string {
         `• 5-Hour Limit: <b>${gemini.fiveHour}</b>${gemini.fiveHourRefresh ? ` (Refreshes in ${gemini.fiveHourRefresh})` : ""}`
       );
     }
-  } else {
-    if (hasGeminiLimits) {
-      lines.push("<b>Gemini Models</b>");
-      if (gemini.weekly) {
-        lines.push(
-          `• Weekly Limit: <b>${gemini.weekly}</b>${gemini.weeklyRefresh ? ` (Refreshes in ${gemini.weeklyRefresh})` : ""}`
-        );
-      }
-      if (gemini.fiveHour) {
-        lines.push(
-          `• 5-Hour Limit: <b>${gemini.fiveHour}</b>${gemini.fiveHourRefresh ? ` (Refreshes in ${gemini.fiveHourRefresh})` : ""}`
-        );
-      }
-      lines.push("");
-    }
+  }
 
-    if (hasClaudeLimits) {
-      lines.push("<b>Claude & GPT Models</b>");
-      if (claude.weekly) {
+  if (hasClaudeLimits) {
+    if (hasGeminiLimits) lines.push("");
+    lines.push("<b>Claude & GPT Models</b>");
+    if (claude.weekly) {
+      lines.push(
+        `• Weekly Limit: <b>${claude.weekly}</b>${claude.weeklyRefresh ? ` (Refreshes in ${claude.weeklyRefresh})` : ""}`
+      );
+    }
+    if (claude.fiveHour) {
+      lines.push(
+        `• 5-Hour Limit: <b>${claude.fiveHour}</b>${claude.fiveHourRefresh ? ` (Refreshes in ${claude.fiveHourRefresh})` : ""}`
+      );
+    }
+  }
+
+  if (!hasGeminiLimits && !hasClaudeLimits) {
+    const general = extractLimits(text);
+    if (general.weekly || general.fiveHour) {
+      lines.push("<b>Antigravity Quota</b>");
+      if (general.weekly) {
         lines.push(
-          `• Weekly Limit: <b>${claude.weekly}</b>${claude.weeklyRefresh ? ` (Refreshes in ${claude.weeklyRefresh})` : ""}`
+          `• Weekly Limit: <b>${general.weekly}</b>${general.weeklyRefresh ? ` (Refreshes in ${general.weeklyRefresh})` : ""}`
         );
       }
-      if (claude.fiveHour) {
+      if (general.fiveHour) {
         lines.push(
-          `• 5-Hour Limit: <b>${claude.fiveHour}</b>${claude.fiveHourRefresh ? ` (Refreshes in ${claude.fiveHourRefresh})` : ""}`
+          `• 5-Hour Limit: <b>${general.fiveHour}</b>${general.fiveHourRefresh ? ` (Refreshes in ${general.fiveHourRefresh})` : ""}`
         );
       }
     }

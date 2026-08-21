@@ -43,7 +43,7 @@ Five Hour Limit Remaining
   assert.doesNotMatch(parsed, /[█░▒▓]/);
 });
 
-test("parseUsageQuota consolidates identical shared quotas into Antigravity Quota (All Models)", () => {
+test("parseUsageQuota preserves separate Gemini and Claude & GPT sections even with identical quotas", () => {
   const sharedSample = `
 Models & Quota
 Account: dev@example.com
@@ -68,10 +68,10 @@ Refreshes in 4h 58m
 `;
 
   const parsed = parseUsageQuota(sharedSample);
-  assert.match(parsed, /<b>Antigravity Quota \(All Models\)<\/b>/);
+  assert.match(parsed, /<b>Gemini Models<\/b>/);
+  assert.match(parsed, /<b>Claude & GPT Models<\/b>/);
   assert.match(parsed, /Weekly Limit: <b>68% remaining<\/b> \(Refreshes in 120h 25m\)/);
   assert.match(parsed, /5-Hour Limit: <b>100% remaining<\/b> \(Refreshes in 4h 58m\)/);
-  assert.doesNotMatch(parsed, /Gemini Models/);
 });
 
 test("parseUsageQuota rejects startup / trust screen without quota data", () => {
