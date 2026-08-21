@@ -1274,7 +1274,14 @@ async function processJob(job: QueueJob, isCancelled: () => boolean): Promise<vo
 
     let result;
     try {
-      await state.setInFlight(job.chatId, { prompt: job.prompt, startedAt: Date.now() });
+      await state.setInFlight(job.chatId, {
+        prompt: job.prompt,
+        kind: job.kind,
+        imagePath: job.imagePath,
+        documentPath: job.documentPath,
+        documentName: job.documentName,
+        startedAt: Date.now(),
+      });
       result = await runAgy(config.agy, job.prompt || "", session?.conversationId || null, {
         ...settings,
         signal: controller.signal,
@@ -1553,13 +1560,30 @@ async function main(): Promise<void> {
   if (Object.keys(interrupted).length > 0) {
     await state.clearAllInFlight();
     for (const [chatId, job] of Object.entries(interrupted)) {
-      const promptSnippet = job.prompt ? ` (Last prompt: <i>"${escapeHtml(job.prompt.slice(0, 50))}${job.prompt.length > 50 ? "..." : ""}"</i>)` : "";
-      await telegram.sendMessage(
-        chatId,
-        `⚡ <b>AGY Gateway restarted</b>\n\nThe service was restarted during your previous request${promptSnippet}.\nI am back online and ready for your next command!`,
-        createMainKeyboard(settingsFor(chatId)),
-        "HTML"
-      ).catch(() => undefined);
+      if (job.prompt || job.kind === "usage" || job.kind === "credits" || job.kind === "context") {
+        const promptSnippet = job.prompt ? ` (Prompt: <i>"${escapeHtml(job.prompt.slice(0, 60))}${job.prompt.length > 60 ? "..." : ""}"</i>)` : "";
+        await telegram.sendMessage(
+          chatId,
+          `⚡ <b>AGY Gateway restarted</b>\n\nYour previous request was interrupted by a restart${promptSnippet}.\n<i>Resuming execution now...</i>`,
+          createMainKeyboard(settingsFor(chatId)),
+          "HTML"
+        ).catch(() => undefined);
+
+        enqueueJob(chatId, {
+          kind: job.kind || "prompt",
+          prompt: job.prompt,
+          imagePath: job.imagePath,
+          documentPath: job.documentPath,
+          documentName: job.documentName,
+        });
+      } else {
+        await telegram.sendMessage(
+          chatId,
+          `⚡ <b>AGY Gateway restarted</b>\n\nI am back online and ready for your next command!`,
+          createMainKeyboard(settingsFor(chatId)),
+          "HTML"
+        ).catch(() => undefined);
+      }
     }
   }
 
