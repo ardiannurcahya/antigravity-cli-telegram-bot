@@ -18,27 +18,33 @@ function stripProgressBar(str: string): string {
 export function parseUsageQuota(rawOutput: string): string {
   const text = cleanAnsi(rawOutput).trim();
 
+  // The TUI autocomplete list can contain 'Gemini', 'Claude', etc.
+  // Find the last occurrence of Models & Quota to isolate the rendered command result panel.
+  const quotaMatches = [...text.matchAll(/(?:└\s*)?Models\s*&\s*Quota/gi)];
+  const quotaStart = quotaMatches.length ? quotaMatches[quotaMatches.length - 1].index ?? -1 : -1;
+  const panel = quotaStart >= 0 ? text.slice(quotaStart) : text;
+
   // Validate that the output contains actual quota information, not just a startup screen
   const hasQuotaIndicator =
-    /models?\s*&\s*quota|weekly\s*limit|gemini\s*models?|claude\s*(?:and|\/)\s*gpt|quota\s*available/i.test(text);
+    /models?\s*&\s*quota|weekly\s*limit|gemini\s*models?|claude\s*(?:and|\/|&)\s*gpt|quota\s*available/i.test(panel);
   if (!hasQuotaIndicator) {
     throw new Error(
-      `AGY did not produce a Models & Quota report.\n\nCaptured output:\n${text.slice(0, 500) || "(empty)"}`
+      `AGY did not produce a Models & Quota report.\n\nCaptured output:\n${panel.slice(0, 500) || "(empty)"}`
     );
   }
 
   // Extract account email
-  const accountMatch = text.match(/(?:Account|User|Email):\s*([^\n\r]+)/i);
+  const accountMatch = panel.match(/(?:Account|User|Email):\s*([^\n\r]+)/i);
   const account = accountMatch ? accountMatch[1].trim() : null;
 
-  // Split into Gemini and Claude sections
-  const geminiPartMatch = text.match(
-    /(?:GEMINI\s*MODELS?|Gemini)[\s\S]*?(?=(?:CLAUDE\s*(?:AND|\/)\s*GPT(?:\s*MODELS?)?|Claude)|$)/i
+  // Split into Gemini and Claude sections within the quota panel
+  const geminiPartMatch = panel.match(
+    /(?:GEMINI\s*MODELS?|Gemini\s+Models?)[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)|$)/i
   );
   const geminiPart = geminiPartMatch ? geminiPartMatch[0] : "";
 
-  const claudePartMatch = text.match(
-    /(?:CLAUDE\s*(?:AND|\/)\s*GPT(?:\s*MODELS?)?|Claude)[\s\S]*$/i
+  const claudePartMatch = panel.match(
+    /(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)[\s\S]*$/i
   );
   const claudePart = claudePartMatch ? claudePartMatch[0] : "";
 
@@ -49,6 +55,8 @@ export function parseUsageQuota(rawOutput: string): string {
     let weeklyRefresh: string | null = null;
     let fiveHour: string | null = null;
     let fiveHourRefresh: string | null = null;
+
+    if (!sectionText) return { weekly, weeklyRefresh, fiveHour, fiveHourRefresh };
 
     // Weekly limit
     const weeklyMatch = sectionText.match(
@@ -120,7 +128,7 @@ export function parseUsageQuota(rawOutput: string): string {
   }
 
   if (!hasGeminiLimits && !hasClaudeLimits) {
-    const general = extractLimits(text);
+    const general = extractLimits(panel);
     if (general.weekly || general.fiveHour) {
       lines.push("<b>Antigravity Quota</b>");
       if (general.weekly) {
