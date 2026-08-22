@@ -24,7 +24,8 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
   if (effective.model) {
     args.push("--model", effective.model);
     const modelHasEffort = /-(low|medium|high)$/i.test(effective.model);
-    if (!modelHasEffort && effective.effort) {
+    const isClaude = /claude/i.test(effective.model);
+    if (!modelHasEffort && !isClaude && effective.effort) {
       args.push("--effort", effective.effort);
     }
   } else if (effective.effort) {

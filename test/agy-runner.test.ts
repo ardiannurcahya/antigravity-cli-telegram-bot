@@ -42,7 +42,7 @@ test("parses quoted custom command arguments without a shell", () => {
 });
 
 test("builds per-session overrides without unsafe flags", () => {
-  assert.deepEqual(buildArgs(config, "hello", null, { model: "claude-sonnet-4-6", effort: "low", mode: "accept-edits", sandbox: false }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "accept-edits", "--model", "claude-sonnet-4-6", "--effort", "low"]);
+  assert.deepEqual(buildArgs(config, "hello", null, { model: "claude-sonnet-4-6", effort: "low", mode: "accept-edits", sandbox: false }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "accept-edits", "--model", "claude-sonnet-4-6"]);
 });
 
 test("extracts nested conversation IDs", () => {
