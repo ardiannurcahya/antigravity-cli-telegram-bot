@@ -2,7 +2,7 @@ import type { ConversationDatabase } from "./db.js";
 import type { JobQueue } from "./queue.js";
 import type { StateStore } from "./state.js";
 import type { TelegramClient } from "./telegram.js";
-import type { AppConfig, ChatId } from "./types.js";
+import type { AppConfig, ChatId, InFlightJob } from "./types.js";
 
 /**
  * Explicit dependency graph of the running bot. Every handler and use case
@@ -16,6 +16,7 @@ export interface AppContext {
   queue: JobQueue;
   readonly controllers: Map<string, AbortController>;
   readonly pendingDangerousCommands: Map<string, string[]>;
+  readonly pendingInterruptedJobs: Map<string, InFlightJob>;
 }
 
 export interface BaseServices {

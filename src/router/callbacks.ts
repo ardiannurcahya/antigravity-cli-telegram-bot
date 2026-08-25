@@ -67,6 +67,23 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
       await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
+    case "retry-interrupted": {
+      const job = context.pendingInterruptedJobs.get(String(chatId));
+      if (!job) {
+        await context.telegram.editMessageText(chatId, messageId, "ℹ️ <i>No interrupted job found or already executed.</i>", undefined, "HTML").catch(() => undefined);
+        return;
+      }
+      context.pendingInterruptedJobs.delete(String(chatId));
+      await context.telegram.editMessageText(chatId, messageId, "🔄 <b>Retrying interrupted job...</b>", undefined, "HTML").catch(() => undefined);
+      enqueueJob(context, chatId, {
+        kind: job.kind || "prompt",
+        prompt: job.prompt,
+        imagePath: job.imagePath,
+        documentPath: job.documentPath,
+        documentName: job.documentName,
+      });
+      return;
+    }
     case "cancel": {
       const result = context.queue.cancelForChat(chatId);
       await context.telegram.editMessageText(chatId, messageId, `Cancelled: ${result.removed} queued, active=${result.activeCancelled ? "yes" : "no"}.`, { inline_keyboard: [] });

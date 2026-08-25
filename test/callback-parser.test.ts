@@ -19,6 +19,7 @@ test("callback parser decodes every wire format the keyboards emit", () => {
   assert.deepEqual(parseCallbackAction("action:setdefault"), { kind: "setdefault" });
   assert.deepEqual(parseCallbackAction("action:update_bot"), { kind: "update-bot" });
   assert.deepEqual(parseCallbackAction("action:new"), { kind: "new-session" });
+  assert.deepEqual(parseCallbackAction("action:retry_interrupted"), { kind: "retry-interrupted" });
   assert.deepEqual(parseCallbackAction("action:cancel"), { kind: "cancel" });
   assert.deepEqual(parseCallbackAction("cli:version"), { kind: "cli", command: "version" });
   assert.deepEqual(parseCallbackAction("toggle:disable-slash"), { kind: "toggle", option: "disable-slash" });
@@ -49,6 +50,7 @@ test("callback parser/serializer round-trips without loss", () => {
     "action:setdefault",
     "action:update_bot",
     "action:new",
+    "action:retry_interrupted",
     "action:cancel",
     "cli:update",
     "toggle:continue",

@@ -6,7 +6,7 @@ import { loadConfig } from "../../src/config.js";
 import { ConversationDatabase } from "../../src/db.js";
 import { JobQueue, type QueueJob } from "../../src/queue.js";
 import { StateStore } from "../../src/state.js";
-import type { AppConfig, TelegramUpdate } from "../../src/types.js";
+import type { AppConfig, InFlightJob, TelegramUpdate } from "../../src/types.js";
 import { FakeTelegramClient } from "./fake-telegram.js";
 
 export interface TestServices {
@@ -17,6 +17,7 @@ export interface TestServices {
   queue: JobQueue;
   controllers: Map<string, AbortController>;
   pendingDangerousCommands: Map<string, string[]>;
+  pendingInterruptedJobs: Map<string, InFlightJob>;
 }
 
 const BASE_ENV: Record<string, string> = {
@@ -67,6 +68,7 @@ export function createHarness(env: Record<string, string> = {}): Harness {
   const telegram = new FakeTelegramClient();
   const controllers = new Map<string, AbortController>();
   const pendingDangerousCommands = new Map<string, string[]>();
+  const pendingInterruptedJobs = new Map<string, InFlightJob>();
   const capturedJobs: Harness["capturedJobs"] = [];
 
   let currentWorker: (job: QueueJob, isCancelled: () => boolean) => Promise<void> = (job, isCancelled) =>
@@ -95,6 +97,7 @@ export function createHarness(env: Record<string, string> = {}): Harness {
     queue,
     controllers,
     pendingDangerousCommands,
+    pendingInterruptedJobs,
     capturedJobs,
     setWorker(worker) {
       currentWorker = worker;

@@ -492,3 +492,38 @@ test("createAppServices wires queue cancellation to controller abortion", async 
     harness.cleanup();
   }
 });
+
+test("lifecycle: interrupted jobs offer interactive retry button and resume on tap", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const { resumeInterruptedJobs } = await import("../src/bot.js");
+    const { handleCallback } = await import("../src/router/callbacks.js");
+
+    await ctx.state.setInFlight(777, { kind: "prompt", prompt: "heavy compute task" });
+    assert.ok(ctx.state.inFlight["777"]);
+
+    await resumeInterruptedJobs(ctx);
+
+    assert.equal(Object.keys(ctx.state.inFlight).length, 0, "in-flight state should be cleared");
+    assert.equal(ctx.pendingInterruptedJobs.get("777")?.prompt, "heavy compute task", "job held in pendingInterruptedJobs");
+
+    const sent = harness.telegram.calls.filter((c) => c.method === "sendMessage");
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].payload.text as string, /AGY Gateway restarted/);
+    assert.match(sent[0].payload.text as string, /heavy compute task/);
+
+    const keyboard = sent[0].payload.reply_markup as import("../src/types.js").InlineKeyboardMarkup;
+    assert.equal(keyboard.inline_keyboard[0][0].callback_data, "action:retry_interrupted");
+
+    // Click the retry button using an authorized user
+    await handleCallback(ctx, callbackUpdate("action:retry_interrupted", 777, 888, 111));
+
+    assert.equal(ctx.pendingInterruptedJobs.has("777"), false, "job cleared from pending on retry");
+    assert.equal(harness.capturedJobs.filter((j) => j.prompt === "heavy compute task").length, 1, "job enqueued on click");
+    assert.match(harness.telegram.editedTexts().at(-1) || "", /Retrying interrupted job/);
+  } finally {
+    harness.cleanup();
+  }
+});
+

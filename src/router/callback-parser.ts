@@ -14,6 +14,7 @@ export type CallbackAction =
   | { kind: "setdefault" }
   | { kind: "update-bot" }
   | { kind: "new-session" }
+  | { kind: "retry-interrupted" }
   | { kind: "cancel" }
   | { kind: "cli"; command: string }
   | { kind: "toggle"; option: string }
@@ -40,6 +41,7 @@ export function parseCallbackAction(data: string): CallbackAction | null {
   if (data === "action:setdefault") return { kind: "setdefault" };
   if (data === "action:update_bot") return { kind: "update-bot" };
   if (data === "action:new") return { kind: "new-session" };
+  if (data === "action:retry_interrupted") return { kind: "retry-interrupted" };
   if (data === "action:cancel") return { kind: "cancel" };
   if (data.startsWith("cli:")) return { kind: "cli", command: data.slice("cli:".length) };
   if (data.startsWith("toggle:")) return { kind: "toggle", option: data.slice("toggle:".length) };
@@ -63,6 +65,7 @@ export function serializeCallbackData(action: CallbackAction): string {
     case "setdefault": return "action:setdefault";
     case "update-bot": return "action:update_bot";
     case "new-session": return "action:new";
+    case "retry-interrupted": return "action:retry_interrupted";
     case "cancel": return "action:cancel";
     case "cli": return `cli:${action.command}`;
     case "toggle": return `toggle:${action.option}`;

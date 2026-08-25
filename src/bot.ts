@@ -11,14 +11,20 @@ import { enqueueJob } from "./usecases/enqueue.js";
 import { runPromptJob } from "./usecases/prompt-job.js";
 import { restartNoticePath } from "./usecases/self-update.js";
 import { handleUpdate } from "./router/updates.js";
-import type { TelegramUpdate } from "./types.js";
+import { button } from "./ui/inline-keyboards.js";
+import type { InFlightJob, InlineKeyboardMarkup, TelegramUpdate } from "./types.js";
 
 /**
  * Completes the service graph: creates the job queue wired to the prompt use
  * case and the cancellation hook that aborts in-flight AGY processes.
  */
 export function createAppServices(base: BaseServices): AppContext {
-  const services = { ...base, controllers: new Map<string, AbortController>(), pendingDangerousCommands: new Map<string, string[]>() } as AppContext;
+  const services = {
+    ...base,
+    controllers: new Map<string, AbortController>(),
+    pendingDangerousCommands: new Map<string, string[]>(),
+    pendingInterruptedJobs: new Map<string, InFlightJob>(),
+  } as AppContext;
   const queue = new JobQueue(base.config.queue.maxSize, (job, isCancelled) => runPromptJob(services, job, isCancelled), {
     onCancel: (chatId) => {
       services.controllers.get(controllerKey("prompt", chatId))?.abort();
@@ -43,7 +49,7 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "model", description: "Show or choose the model" },
   { command: "effort", description: "Show or change reasoning effort" },
   { command: "mode", description: "Show or change plan/edit mode" },
-  { command: "sandbox", description: "Show or change sandbox mode" },
+  { command: "sandbox", description: "Toggle AGY sandbox execution" },
   { command: "verbose", description: "Show or change verbose level (detailed, compact, silent)" },
   { command: "session", description: "Show session settings" },
   { command: "learn", description: "Learn reusable rules/skills from recent chat" },
@@ -104,21 +110,19 @@ export async function resumeInterruptedJobs(context: AppContext): Promise<void> 
     await context.state.clearAllInFlight();
     for (const [chatId, job] of Object.entries(interrupted)) {
       if (job.prompt || job.kind === "usage" || job.kind === "credits" || job.kind === "context") {
+        context.pendingInterruptedJobs.set(String(chatId), job);
         const promptSnippet = job.prompt ? ` (Prompt: <i>"${escapeHtml(job.prompt.slice(0, 60))}${job.prompt.length > 60 ? "..." : ""}"</i>)` : "";
+        const retryKeyboard: InlineKeyboardMarkup = {
+          inline_keyboard: [
+            [button("🔄 Retry Interrupted Job", "action:retry_interrupted")],
+          ],
+        };
         await context.telegram.sendMessage(
           chatId,
-          `⚡ <b>AGY Gateway restarted</b>\n\nYour previous request was interrupted by a restart${promptSnippet}.\n<i>Resuming execution now...</i>`,
-          createMainKeyboard(settingsFor(context, chatId)),
+          `⚡ <b>AGY Gateway restarted</b>\n\nYour previous request was interrupted by a service restart${promptSnippet}.\n<i>Click the button below to resume execution.</i>`,
+          retryKeyboard,
           "HTML"
         ).catch(() => undefined);
-
-        enqueueJob(context, chatId, {
-          kind: job.kind || "prompt",
-          prompt: job.prompt,
-          imagePath: job.imagePath,
-          documentPath: job.documentPath,
-          documentName: job.documentName,
-        });
       } else {
         await context.telegram.sendMessage(
           chatId,
