@@ -151,15 +151,21 @@ export function runAgyCommand(config: AgyConfig, commandArgs: string[], timeoutM
     child.stderr.on("data", (chunk: Buffer) => {
       if (stderr.length < 4000) stderr += chunk.toString();
     });
-    child.on("error", (error) => finish(() => reject(error)));
-    child.on("close", (code, signal) => finish(() => {
-      if (code !== 0) {
-        const detail = stderr.trim().replace(/\s+/g, " ").slice(0, 1000);
-        reject(new Error(`AGY command exited with ${code ?? signal}${detail ? `: ${detail}` : ""}`));
-        return;
-      }
-      resolve(stdout.trim() || stderr.trim() || "AGY returned no output.");
-    }));
+    child.on("error", (error) => {
+      stop();
+      finish(() => reject(error));
+    });
+    child.on("close", (code, signal) => {
+      stop();
+      finish(() => {
+        if (code !== 0) {
+          const detail = stderr.trim().replace(/\s+/g, " ").slice(0, 1000);
+          reject(new Error(`AGY command exited with ${code ?? signal}${detail ? `: ${detail}` : ""}`));
+          return;
+        }
+        resolve(stdout.trim() || stderr.trim() || "AGY returned no output.");
+      });
+    });
   });
 }
 
@@ -366,8 +372,12 @@ export function runAgy(config: AgyConfig, prompt: string, conversationId: string
       pendingLine += text; const lines = pendingLine.split(/\r?\n/); pendingLine = lines.pop() || ""; lines.forEach(emit);
     });
     child.stderr.on("data", (chunk: Buffer) => { if (stderr.length < 4000) stderr += chunk.toString(); });
-    child.on("error", (error) => finish(reject as (value: never) => void, error as never));
+    child.on("error", (error) => {
+      stop(true);
+      finish(reject as (value: never) => void, error as never);
+    });
     child.on("close", (code, signalName) => {
+      stop(true);
       if (outputFormat === "stream-json") emit(pendingLine);
       if (timedOut) return finish(reject as (value: never) => void, new Error(`AGY timed out after ${config.timeoutMs}ms`) as never);
       if (outputLimited) return finish(reject as (value: never) => void, new Error(`AGY output exceeded ${config.maxOutputBytes} bytes`) as never);

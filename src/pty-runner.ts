@@ -371,12 +371,26 @@ try:
                 break
 finally:
     try:
-        os.kill(pid, signal.SIGTERM)
-        time.sleep(0.1)
-        os.kill(pid, signal.SIGKILL)
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGTERM)
+    except Exception:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except Exception:
+            pass
+    time.sleep(0.1)
+    try:
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGKILL)
+    except Exception:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception:
+            pass
+    try:
+        os.close(master)
     except Exception:
         pass
-    os.close(master)
     try:
         os.waitpid(pid, 0)
     except Exception:
