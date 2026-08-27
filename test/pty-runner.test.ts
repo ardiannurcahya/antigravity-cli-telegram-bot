@@ -7,7 +7,7 @@ test("cleanAnsi removes terminal escape codes, OSC sequences, and kitty sequence
   assert.equal(cleanAnsi(raw).trim(), "Hello World");
 });
 
-test("parseUsageQuota formats production GEMINI MODELS & CLAUDE AND GPT MODELS with progress bars", () => {
+test("parseUsageQuota formats production GEMINI MODELS & CLAUDE AND GPT MODELS with progress bars and traffic lights", () => {
   const productionSample = `
 Models & Quota
 
@@ -34,11 +34,11 @@ Five Hour Limit Remaining
   assert.match(parsed, /📊 <b>Models & Quota<\/b>/);
   assert.match(parsed, /<b>Account:<\/b> <code>ardiannurcahya436@gmail.com<\/code>/);
   assert.match(parsed, /<b>Gemini Models<\/b>/);
-  assert.match(parsed, /Weekly Limit: <b>94% remaining<\/b> \(Refreshes in 151h 15m\)/);
-  assert.match(parsed, /5-Hour Limit: <b>81% remaining<\/b> \(Refreshes in 1h 52m\)/);
+  assert.match(parsed, /Weekly: 🟢 <b>94%<\/b> \(in 151h 15m\) <i>\[\+4%\]<\/i>/);
+  assert.match(parsed, /5-Hour: ⭐ <b>81%<\/b> \(in 1h 52m\) <i>\[\+44%\]<\/i>/);
   assert.match(parsed, /<b>Claude &amp; GPT Models<\/b>|<b>Claude & GPT Models<\/b>/);
-  assert.match(parsed, /Weekly Limit: <b>100% Quota available<\/b>/);
-  assert.match(parsed, /5-Hour Limit: <b>100% Quota available<\/b>/);
+  assert.match(parsed, /Weekly: 🟢 <b>100%<\/b>/);
+  assert.match(parsed, /5-Hour: 🟢 <b>100%<\/b>/);
   // Ensure progress bar characters are NOT captured
   assert.doesNotMatch(parsed, /[█░▒▓]/);
 });
@@ -70,8 +70,41 @@ Refreshes in 4h 58m
   const parsed = parseUsageQuota(sharedSample);
   assert.match(parsed, /<b>Gemini Models<\/b>/);
   assert.match(parsed, /<b>Claude & GPT Models<\/b>/);
-  assert.match(parsed, /Weekly Limit: <b>68% remaining<\/b> \(Refreshes in 120h 25m\)/);
-  assert.match(parsed, /5-Hour Limit: <b>100% remaining<\/b> \(Refreshes in 4h 58m\)/);
+  assert.match(parsed, /Weekly: 🟡 <b>68%<\/b> \(in 120h 25m\) <i>\[-4%\]<\/i>/);
+  assert.match(parsed, /5-Hour: 🟢 <b>100%<\/b> \(in 4h 58m\) <i>\[\+1%\]<\/i>/);
+});
+
+test("parseUsageQuota correctly classifies Star, Green, Amber, and Red pacing", () => {
+  // Green (on track): 84% remaining with 141h 43m left (expected ~84.4%, delta -0.4% -> On track)
+  // Star (comfortable buffer): 91% remaining with 1h 42m left (expected 34%, delta +57% -> ⭐)
+  const sample = `
+Models & Quota
+GEMINI MODELS
+Weekly Limit Remaining
+84% remaining
+Refreshes in 141h 43m
+Five Hour Limit Remaining
+91% remaining
+Refreshes in 1h 42m
+`;
+  const greenParsed = parseUsageQuota(sample);
+  assert.match(greenParsed, /Weekly: 🟢 <b>84%<\/b> \(in 141h 43m\) <i>\[On track\]<\/i>/);
+  assert.match(greenParsed, /5-Hour: ⭐ <b>91%<\/b> \(in 1h 42m\) <i>\[\+57%\]<\/i>/);
+
+  // Red (critical pacing): 50% remaining with 120h left (expected 71.4% -> delta -21.4%)
+  const redSample = `
+Models & Quota
+GEMINI MODELS
+Weekly Limit Remaining
+50% remaining
+Refreshes in 120h
+Five Hour Limit Remaining
+8% remaining
+Refreshes in 30m
+`;
+  const redParsed = parseUsageQuota(redSample);
+  assert.match(redParsed, /Weekly: 🔴 <b>50%<\/b> \(in 120h\) <i>\[-21%\]<\/i>/);
+  assert.match(redParsed, /5-Hour: 🔴 <b>8%<\/b> \(in 30m\) <i>\[-2%\]<\/i>/);
 });
 
 test("parseUsageQuota rejects startup / trust screen without quota data", () => {
@@ -125,8 +158,45 @@ test("parseUsageQuota preserves decimal percentages from AGY progress output", (
     [██████████████████████████████████████████████████] 100.00%
     Quota available
   `);
-  assert.match(parsed, /100\.00% Quota available/);
-  assert.doesNotMatch(parsed, /<b>00% Quota available<\/b>/);
+  assert.match(parsed, /Weekly: 🟢 <b>100\.00%<\/b>/);
+  assert.doesNotMatch(parsed, /<b>00%/);
+});
+
+test("parseUsageQuota handles 0.00% and Disabled limits accurately", () => {
+  const sample = `
+└ Models & Quota
+
+  Account: stephan.bolten@gmail.com
+
+GEMINI MODELS
+  Models within this group: Gemini Flash, Gemini Pro
+
+  Weekly Limit Remaining
+    [███████████████████████████████████████░░░░░░░░░░░] 78.92%
+    79% remaining · Refreshes in 125h 46m
+
+  Five Hour Limit Remaining
+    [█████████████████████████████████████████████████░] 98.67%
+    99% remaining · Refreshes in 4h 45m
+
+CLAUDE AND GPT MODELS
+  Models within this group: Claude Opus, Claude Sonnet, GPT-OSS
+
+  Weekly Limit Remaining
+    [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0.00%
+    Refreshes in 59h 50m
+
+  Five Hour Limit Remaining
+    Disabled: You have hit your weekly limit, the 5-hour limit does not currently apply. Your weekly limit will fully re
+`;
+
+  const parsed = parseUsageQuota(sample);
+  assert.match(parsed, /<b>Gemini Models<\/b>/);
+  assert.match(parsed, /Weekly: 🟢 <b>78\.92%<\/b> \(in 125h 46m\)/);
+  assert.match(parsed, /5-Hour: 🟢 <b>98\.67%<\/b> \(in 4h 45m\)/);
+  assert.match(parsed, /<b>Claude & GPT Models<\/b>/);
+  assert.match(parsed, /Weekly: 🔴 <b>0\.00%<\/b> \(in 59h 50m\)/);
+  assert.match(parsed, /5-Hour: ⚪ <i>Disabled<\/i>/);
 });
 
 test("runPtyCommand cancels immediately when AbortSignal is aborted", async () => {

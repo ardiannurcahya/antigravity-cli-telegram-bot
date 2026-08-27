@@ -121,10 +121,10 @@ else:
   assert.match(usageHtml, /📊 <b>Models & Quota<\/b>/);
   assert.match(usageHtml, /<code>ardiannurcahya436@gmail\.com<\/code>/);
   assert.match(usageHtml, /<b>Gemini Models<\/b>/);
-  assert.match(usageHtml, /Weekly Limit: <b>94% remaining<\/b> \(Refreshes in 151h 15m\)/);
-  assert.match(usageHtml, /5-Hour Limit: <b>81% remaining<\/b> \(Refreshes in 1h 52m\)/);
+  assert.match(usageHtml, /Weekly: 🟢 <b>94%<\/b> \(in 151h 15m\) <i>\[\+4%\]<\/i>/);
+  assert.match(usageHtml, /5-Hour: ⭐ <b>81%<\/b> \(in 1h 52m\) <i>\[\+44%\]<\/i>/);
   assert.match(usageHtml, /<b>Claude &amp; GPT Models<\/b>|<b>Claude & GPT Models<\/b>/);
-  assert.match(usageHtml, /Weekly Limit: <b>100% Quota available<\/b>/);
+  assert.match(usageHtml, /Weekly: 🟢 <b>100%<\/b>/);
 
   // 2. Test /credits via full interactive PTY
   const creditsRaw = await runPtyCommand(dummyConfig, "/credits", { timeoutMs: 8000 });

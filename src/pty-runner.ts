@@ -15,6 +15,101 @@ function stripProgressBar(str: string): string {
   return str.replace(/[█░▒▓━═─\-_[\]=><#]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+export function parseDurationToMinutes(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const str = text.trim().toLowerCase();
+  let totalMinutes = 0;
+  let matched = false;
+
+  const daysMatch = str.match(/(\d+(?:\.\d+)?)\s*d(?:ays?)?/);
+  if (daysMatch) {
+    totalMinutes += parseFloat(daysMatch[1]) * 24 * 60;
+    matched = true;
+  }
+
+  const hoursMatch = str.match(/(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?/);
+  if (hoursMatch) {
+    totalMinutes += parseFloat(hoursMatch[1]) * 60;
+    matched = true;
+  }
+
+  const minsMatch = str.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?/);
+  if (minsMatch) {
+    totalMinutes += parseFloat(minsMatch[1]);
+    matched = true;
+  }
+
+  const secsMatch = str.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?/);
+  if (secsMatch) {
+    totalMinutes += parseFloat(secsMatch[1]) / 60;
+    matched = true;
+  }
+
+  return matched ? totalMinutes : null;
+}
+
+export function formatQuotaLimitLine(
+  label: string,
+  val: string | null,
+  refresh: string | null,
+  windowMinutes: number
+): string | null {
+  if (!val) return null;
+
+  const isValDisabled = /disabled/i.test(val);
+  const pctMatch = val.match(/(\d+(?:\.\d+)?)\s*%/);
+  const actualPct = pctMatch ? parseFloat(pctMatch[1]) : (isValDisabled ? 0 : null);
+  const displayVal = pctMatch ? `${pctMatch[1]}%` : val;
+  const remainingMinutes = parseDurationToMinutes(refresh);
+
+  let indicator = "🟢";
+  let bufferTag = "";
+
+  if (isValDisabled) {
+    indicator = "⚪";
+    const refreshPart = refresh ? ` (in ${refresh})` : "";
+    return `• ${label}: ${indicator} <i>Disabled</i>${refreshPart}`;
+  }
+
+  if (actualPct !== null) {
+    if (remainingMinutes !== null && windowMinutes > 0) {
+      const timeRemainingRatio = Math.min(1, Math.max(0, remainingMinutes / windowMinutes));
+      const expectedPct = timeRemainingRatio * 100;
+      const delta = actualPct - expectedPct;
+
+      if (actualPct < 10 || delta < -12) {
+        indicator = "🔴";
+      } else if (delta < -3) {
+        indicator = "🟡";
+      } else if (delta >= 10) {
+        indicator = "⭐";
+      } else {
+        indicator = "🟢";
+      }
+
+      const roundedDelta = Math.round(delta);
+      if (indicator === "🟢" && delta >= -2 && delta <= 0.5) {
+        bufferTag = " <i>[On track]</i>";
+      } else if (roundedDelta > 0) {
+        bufferTag = ` <i>[+${roundedDelta}%]</i>`;
+      } else {
+        bufferTag = ` <i>[${roundedDelta}%]</i>`;
+      }
+    } else {
+      if (actualPct < 10) {
+        indicator = "🔴";
+      } else if (actualPct < 30) {
+        indicator = "🟡";
+      } else {
+        indicator = "🟢";
+      }
+    }
+  }
+
+  const refreshPart = refresh ? ` (in ${refresh})` : "";
+  return `• ${label}: ${indicator} <b>${displayVal}</b>${refreshPart}${bufferTag}`;
+}
+
 export function parseUsageQuota(rawOutput: string): string {
   const text = cleanAnsi(rawOutput).trim();
 
@@ -64,10 +159,14 @@ export function parseUsageQuota(rawOutput: string): string {
     );
     if (weeklyMatch) {
       const cleanWeekly = stripProgressBar(weeklyMatch[0]);
-      const valMatch = cleanWeekly.match(
-        /(\d+(?:\.\d+)?%\s*(?:remaining|available|Quota available)|Quota available|\d+(?:\.\d+)?%\s*left)/i
-      );
-      if (valMatch) weekly = valMatch[1].trim();
+      if (/disabled/i.test(cleanWeekly)) {
+        weekly = "Disabled";
+      } else {
+        const valMatch = cleanWeekly.match(
+          /(\d+(?:\.\d+)?%\s*(?:remaining|available|Quota available|left)?|Quota available)/i
+        );
+        if (valMatch) weekly = valMatch[1].trim();
+      }
       const refreshMatch = cleanWeekly.match(/Refreshes\s*in\s*([0-9a-zA-Z\s]+)/i);
       if (refreshMatch) weeklyRefresh = refreshMatch[1].trim();
     }
@@ -78,10 +177,14 @@ export function parseUsageQuota(rawOutput: string): string {
     );
     if (fiveHourMatch) {
       const cleanFive = stripProgressBar(fiveHourMatch[0]);
-      const valMatch = cleanFive.match(
-        /(\d+(?:\.\d+)?%\s*(?:remaining|available|Quota available)|Quota available|\d+(?:\.\d+)?%\s*left)/i
-      );
-      if (valMatch) fiveHour = valMatch[1].trim();
+      if (/disabled/i.test(cleanFive)) {
+        fiveHour = "Disabled";
+      } else {
+        const valMatch = cleanFive.match(
+          /(\d+(?:\.\d+)?%\s*(?:remaining|available|Quota available|left)?|Quota available)/i
+        );
+        if (valMatch) fiveHour = valMatch[1].trim();
+      }
       const refreshMatch = cleanFive.match(/Refreshes\s*in\s*([0-9a-zA-Z\s]+)/i);
       if (refreshMatch) fiveHourRefresh = refreshMatch[1].trim();
     }
@@ -98,49 +201,34 @@ export function parseUsageQuota(rawOutput: string): string {
   const hasGeminiLimits = Boolean(gemini.weekly || gemini.fiveHour);
   const hasClaudeLimits = Boolean(claude.weekly || claude.fiveHour);
 
+  const WEEKLY_WINDOW_MINUTES = 7 * 24 * 60; // 10080 mins = 168h
+  const FIVE_HOUR_WINDOW_MINUTES = 5 * 60; // 300 mins = 5h
+
   if (hasGeminiLimits) {
     lines.push("<b>Gemini Models</b>");
-    if (gemini.weekly) {
-      lines.push(
-        `• Weekly Limit: <b>${gemini.weekly}</b>${gemini.weeklyRefresh ? ` (Refreshes in ${gemini.weeklyRefresh})` : ""}`
-      );
-    }
-    if (gemini.fiveHour) {
-      lines.push(
-        `• 5-Hour Limit: <b>${gemini.fiveHour}</b>${gemini.fiveHourRefresh ? ` (Refreshes in ${gemini.fiveHourRefresh})` : ""}`
-      );
-    }
+    const weeklyLine = formatQuotaLimitLine("Weekly", gemini.weekly, gemini.weeklyRefresh, WEEKLY_WINDOW_MINUTES);
+    if (weeklyLine) lines.push(weeklyLine);
+    const fiveHourLine = formatQuotaLimitLine("5-Hour", gemini.fiveHour, gemini.fiveHourRefresh, FIVE_HOUR_WINDOW_MINUTES);
+    if (fiveHourLine) lines.push(fiveHourLine);
   }
 
   if (hasClaudeLimits) {
     if (hasGeminiLimits) lines.push("");
     lines.push("<b>Claude & GPT Models</b>");
-    if (claude.weekly) {
-      lines.push(
-        `• Weekly Limit: <b>${claude.weekly}</b>${claude.weeklyRefresh ? ` (Refreshes in ${claude.weeklyRefresh})` : ""}`
-      );
-    }
-    if (claude.fiveHour) {
-      lines.push(
-        `• 5-Hour Limit: <b>${claude.fiveHour}</b>${claude.fiveHourRefresh ? ` (Refreshes in ${claude.fiveHourRefresh})` : ""}`
-      );
-    }
+    const weeklyLine = formatQuotaLimitLine("Weekly", claude.weekly, claude.weeklyRefresh, WEEKLY_WINDOW_MINUTES);
+    if (weeklyLine) lines.push(weeklyLine);
+    const fiveHourLine = formatQuotaLimitLine("5-Hour", claude.fiveHour, claude.fiveHourRefresh, FIVE_HOUR_WINDOW_MINUTES);
+    if (fiveHourLine) lines.push(fiveHourLine);
   }
 
   if (!hasGeminiLimits && !hasClaudeLimits) {
     const general = extractLimits(panel);
     if (general.weekly || general.fiveHour) {
       lines.push("<b>Antigravity Quota</b>");
-      if (general.weekly) {
-        lines.push(
-          `• Weekly Limit: <b>${general.weekly}</b>${general.weeklyRefresh ? ` (Refreshes in ${general.weeklyRefresh})` : ""}`
-        );
-      }
-      if (general.fiveHour) {
-        lines.push(
-          `• 5-Hour Limit: <b>${general.fiveHour}</b>${general.fiveHourRefresh ? ` (Refreshes in ${general.fiveHourRefresh})` : ""}`
-        );
-      }
+      const weeklyLine = formatQuotaLimitLine("Weekly", general.weekly, general.weeklyRefresh, WEEKLY_WINDOW_MINUTES);
+      if (weeklyLine) lines.push(weeklyLine);
+      const fiveHourLine = formatQuotaLimitLine("5-Hour", general.fiveHour, general.fiveHourRefresh, FIVE_HOUR_WINDOW_MINUTES);
+      if (fiveHourLine) lines.push(fiveHourLine);
     }
   }
 
@@ -329,7 +417,16 @@ try:
 
         # Check active prompt readiness. AGY places the prompt between TUI
         # rows, so it may be in the middle of the accumulated buffer.
-        has_prompt_symbol = bool(re.search(r'(?m)^[ \\t]*[❯>][ \\t]*(?:\\n|$)', cleaned)) or ('type a command' in lower_cleaned) or ('ask anything' in lower_cleaned)
+        has_prompt_symbol = (
+            bool(re.search(r'(?m)^[ \\t]*[❯>][ \\t]*(?:\\n|$)', cleaned))
+            or ('? for shortcuts' in lower_cleaned)
+            or ('for shortcuts' in lower_cleaned)
+            or ('type a command' in lower_cleaned)
+            or ('ask anything' in lower_cleaned)
+            or ('accept-edits' in lower_cleaned and 'gemini' in lower_cleaned)
+            or ('bypass permissions' in lower_cleaned)
+            or ('plan mode' in lower_cleaned)
+        )
 
         if not sent_command:
             if has_prompt_symbol:
@@ -353,7 +450,7 @@ try:
         # After sending command
         if sent_command:
             has_quota_result = ('models & quota' in lower_cleaned) or ('weekly limit' in lower_cleaned) or ('credits remaining' in lower_cleaned) or ('g1 credits' in lower_cleaned) or ('balance:' in lower_cleaned)
-            has_context_result = ('active context' in lower_cleaned) or ('context window' in lower_cleaned) or ('estimated tokens' in lower_cleaned)
+            has_context_result = ('active context' in lower_cleaned) or ('context usage' in lower_cleaned) or ('context window' in lower_cleaned) or ('estimated tokens' in lower_cleaned)
             if has_quota_result or has_context_result:
                 if time.time() - last_data_time >= 0.8:
                     break
@@ -371,12 +468,26 @@ try:
                 break
 finally:
     try:
-        os.kill(pid, signal.SIGTERM)
-        time.sleep(0.1)
-        os.kill(pid, signal.SIGKILL)
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGTERM)
+    except Exception:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except Exception:
+            pass
+    time.sleep(0.1)
+    try:
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGKILL)
+    except Exception:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception:
+            pass
+    try:
+        os.close(master)
     except Exception:
         pass
-    os.close(master)
     try:
         os.waitpid(pid, 0)
     except Exception:
@@ -471,4 +582,182 @@ export function runPtyCommand(
       })
     );
   });
+}
+
+function formatDurationFromMs(diffMs: number): string {
+  if (diffMs <= 0) return "now";
+  const totalMins = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMins / (24 * 60));
+  const hours = Math.floor((totalMins % (24 * 60)) / 60);
+  const mins = totalMins % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+interface QuotaBucketJson {
+  id: string;
+  name: string;
+  description?: string;
+  window?: string;
+  remaining_fraction?: number;
+  reset_time?: string;
+  disabled?: boolean;
+}
+
+interface QuotaGroupJson {
+  name: string;
+  description?: string;
+  buckets: QuotaBucketJson[];
+}
+
+export async function getUsageQuotaDirect(config: AgyConfig, options: PtyRunnerOptions = {}): Promise<string> {
+  const { timeoutMs = 15_000, signal } = options;
+
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("Command cancelled"));
+
+    const child = spawn(config.bin, ["--print", "/quota", "--output-format", "json", "--dangerously-skip-permissions"], {
+      cwd: config.workspace,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`Direct quota command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0 && !stdout.trim()) {
+        return reject(new Error(`Direct quota failed (exit code ${code}): ${stderr.trim()}`));
+      }
+
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        const groups: QuotaGroupJson[] = parsed?.command?.data?.groups || [];
+        if (!groups.length) {
+          return reject(new Error("No quota groups in response JSON"));
+        }
+
+        const lines = ["📊 <b>Models & Quota</b>\n"];
+        const WEEKLY_WINDOW_MINUTES = 7 * 24 * 60;
+        const FIVE_HOUR_WINDOW_MINUTES = 5 * 60;
+
+        for (let i = 0; i < groups.length; i++) {
+          const g = groups[i];
+          if (i > 0) lines.push("");
+          lines.push(`<b>${g.name}</b>`);
+
+          for (const b of g.buckets) {
+            const isWeekly = b.window === "weekly" || b.id.includes("weekly");
+            const label = isWeekly ? "Weekly" : "5-Hour";
+            const windowMins = isWeekly ? WEEKLY_WINDOW_MINUTES : FIVE_HOUR_WINDOW_MINUTES;
+
+            if (b.disabled) {
+              const refreshStr = b.reset_time ? formatDurationFromMs(new Date(b.reset_time).getTime() - Date.now()) : null;
+              const formattedLine = formatQuotaLimitLine(label, "Disabled", refreshStr, windowMins);
+              if (formattedLine) lines.push(formattedLine);
+            } else {
+              const frac = typeof b.remaining_fraction === "number" ? b.remaining_fraction : 1;
+              const pctStr = `${Math.round(frac * 100)}%`;
+              const refreshStr = b.reset_time ? formatDurationFromMs(new Date(b.reset_time).getTime() - Date.now()) : null;
+              const formattedLine = formatQuotaLimitLine(label, pctStr, refreshStr, windowMins);
+              if (formattedLine) lines.push(formattedLine);
+            }
+          }
+        }
+
+        resolve(lines.join("\n").trim());
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+export async function getCreditsDirect(config: AgyConfig, options: PtyRunnerOptions = {}): Promise<string> {
+  const { timeoutMs = 15_000, signal } = options;
+
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("Command cancelled"));
+
+    const child = spawn(config.bin, ["--print", "/credits", "--output-format", "json", "--dangerously-skip-permissions"], {
+      cwd: config.workspace,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`Direct credits command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0 && !stdout.trim()) {
+        return reject(new Error(`Direct credits failed (exit code ${code}): ${stderr.trim()}`));
+      }
+
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        const data = parsed?.command?.data || {};
+        const remaining = data.remaining_credits ?? data.credits;
+        const upgradeUri = data.upgrade_uri || data.upgrade_url;
+
+        const lines = ["💳 <b>AGY Credits</b>\n"];
+        if (remaining !== undefined) {
+          lines.push(`• Credits Remaining: <b>${remaining}</b>`);
+        }
+        if (upgradeUri) {
+          lines.push(`• Purchase / Top-up: <a href="${upgradeUri}">${upgradeUri}</a>`);
+        }
+
+        if (lines.length === 1) {
+          return reject(new Error("No credits data in response JSON"));
+        }
+
+        resolve(lines.join("\n").trim());
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+export async function getUsageQuota(config: AgyConfig, options: PtyRunnerOptions = {}): Promise<string> {
+  try {
+    return await getUsageQuotaDirect(config, options);
+  } catch {
+    const raw = await runPtyCommand(config, "/usage", options);
+    return parseUsageQuota(raw);
+  }
+}
+
+export async function getCredits(config: AgyConfig, options: PtyRunnerOptions = {}): Promise<string> {
+  try {
+    return await getCreditsDirect(config, options);
+  } catch {
+    const raw = await runPtyCommand(config, "/credits", options);
+    return parseCredits(raw);
+  }
 }
