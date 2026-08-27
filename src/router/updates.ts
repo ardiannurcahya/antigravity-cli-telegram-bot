@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AppContext } from "../context.js";
+import { controllerKey } from "../context.js";
 import { parseCommandArgs } from "../agy-runner.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { settingsFor } from "../domain/settings.js";
@@ -76,6 +77,14 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     if (buttonText === "✨ New session" || buttonText === "✨ New") {
       await context.state.resetSession(message.chat.id);
       await replyWithHtml(context, message.chat.id, sessionInfoHtml(context, message.chat.id), createMainKeyboard(settingsFor(context, message.chat.id)));
+      return;
+    }
+    if (buttonText === "🛑 Stop" || buttonText === "🛑 Cancel" || buttonText === "Stop" || buttonText === "Cancel") {
+      context.pendingDangerousCommands.delete(String(message.chat.id));
+      context.controllers.get(controllerKey("prompt", message.chat.id))?.abort();
+      context.controllers.get(controllerKey("custom", message.chat.id))?.abort();
+      const result = context.queue.cancelForChat(message.chat.id);
+      await reply(context, message.chat.id, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, message.chat.id)));
       return;
     }
     if (buttonText === "🤖 Model") { await reply(context, message.chat.id, "Select a model:", modelKeyboard(context, message.chat.id)); return; }

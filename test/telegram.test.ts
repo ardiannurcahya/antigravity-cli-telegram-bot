@@ -18,9 +18,9 @@ test("splitPreformattedHtml preserves HTML tags without double escaping", () => 
 
 test("splits Telegram messages near line boundaries", () => { const chunks = splitMessage("one\ntwo\nthree\nfour", 8); assert.deepEqual(chunks, ["one\ntwo", "three", "four"]); assert.ok(chunks.every((chunk) => chunk.length <= 8)); });
 
-test("builds a persistent new session, model, and quota reply keyboard beside the input", () => {
+test("builds a persistent new session, stop, model, and quota reply keyboard beside the input", () => {
   const keyboard = createMainKeyboard({ model: "gemini-3.6-flash-high", effort: "high", mode: "plan", sandbox: true, verbose: "detailed" });
-  assert.deepEqual(keyboard.keyboard, [["✨ New session", "🤖 Model", "📊 Quota"]]);
+  assert.deepEqual(keyboard.keyboard, [["✨ New", "🛑 Stop", "🤖 Model", "📊 Quota"]]);
   assert.equal(keyboard.resize_keyboard, true);
   assert.equal(keyboard.is_persistent, true);
   assert.equal("inline_keyboard" in keyboard, false);

@@ -343,7 +343,7 @@ test("queue feedback: position announcements and queue-full notice", async () =>
   }
 });
 
-test("/cancel aborts in-flight controllers and clears pending dangerous commands", async () => {
+test("/cancel and /stop abort in-flight controllers and clear pending dangerous commands", async () => {
   const harness = createHarness();
   const ctx = asAppContext(harness);
   try {
@@ -351,10 +351,16 @@ test("/cancel aborts in-flight controllers and clears pending dangerous commands
     ctx.controllers.set(`custom:${777}`, controller);
     ctx.pendingDangerousCommands.set("777", ["update"]);
 
-    await handleCommand(ctx, textUpdate(777, "").message!, "/cancel", []);
+    await handleCommand(ctx, textUpdate(777, "").message!, "/stop", []);
 
     assert.equal(controller.signal.aborted, true);
     assert.equal(ctx.pendingDangerousCommands.has("777"), false);
+    assert.equal(harness.telegram.sentTexts().at(-1), "⛔ Cancelled: 0 queued job(s) removed, active AGY process terminated.");
+
+    const promptController = new AbortController();
+    ctx.controllers.set(`prompt:${777}`, promptController);
+    await handleUpdate(ctx, textUpdate(777, "🛑 Stop"));
+    assert.equal(promptController.signal.aborted, true);
     assert.equal(harness.telegram.sentTexts().at(-1), "⛔ Cancelled: 0 queued job(s) removed, active AGY process terminated.");
   } finally {
     harness.cleanup();

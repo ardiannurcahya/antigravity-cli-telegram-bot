@@ -4,7 +4,7 @@ import type { ReplyKeyboardMarkup, SessionSettings } from "./types.js";
 export function createMainKeyboard(_settings?: SessionSettings): ReplyKeyboardMarkup {
   return {
     keyboard: [
-      ["✨ New session", "🤖 Model", "📊 Quota"],
+      ["✨ New", "🛑 Stop", "🤖 Model", "📊 Quota"],
     ],
     resize_keyboard: true,
     is_persistent: true,

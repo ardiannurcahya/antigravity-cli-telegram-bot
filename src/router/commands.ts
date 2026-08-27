@@ -339,7 +339,7 @@ command("/status")(async ({ context, chatId }) => {
   await reply(context, chatId, `Status: ${status.active ? `running (${status.active.id})` : "idle"}\nQueued for this chat: ${status.queued}\nTotal queued: ${status.totalQueued}`, createMainKeyboard(settingsFor(context, chatId)));
 });
 
-command("/cancel", "/kill")(async ({ context, chatId }) => {
+command("/cancel", "/kill", "/stop")(async ({ context, chatId }) => {
   context.pendingDangerousCommands.delete(String(chatId));
   context.controllers.get(controllerKey("prompt", chatId))?.abort();
   context.controllers.get(controllerKey("custom", chatId))?.abort();

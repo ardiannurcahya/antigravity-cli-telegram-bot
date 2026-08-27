@@ -8,7 +8,7 @@ export const ORIGINAL_COMMANDS: string[] = [
   "/models", "/model", "/effort", "/mode", "/sandbox", "/verbose", "/agent", "/project", "/add-dir",
   "/output-format", "/json-schema", "/log-file", "/print-timeout", "/resume", "/sessions", "/continue",
   "/new-project", "/disable-slash-commands", "/agents", "/changelog", "/plugins", "/cli-help", "/version",
-  "/session", "/usage", "/quota", "/credits", "/context", "/tokens", "/status", "/cancel", "/kill",
+  "/session", "/usage", "/quota", "/credits", "/context", "/tokens", "/status", "/cancel", "/kill", "/stop",
   "/learn", "/compact", "/agy-confirm",
 ];
 
