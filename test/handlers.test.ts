@@ -233,7 +233,9 @@ test("callbacks: toggle, action:new, action:cancel, resume validation, menu rout
     assert.equal(ctx.state.session(777)?.settings?.newProject, true);
 
     await handleCallback(ctx, callbackUpdate("action:new"));
-    assert.equal(await ctx.state.session(777), null);
+    assert.equal(ctx.state.session(777)?.conversationId, undefined);
+    assert.equal(ctx.state.session(777)?.settings?.continueSession, false);
+    assert.equal(ctx.state.session(777)?.settings?.newProject, false);
     assert.match(String(harness.telegram.editedTexts().at(-1)), /^✨ <b>New AGY conversation started\.<\/b>/);
     assert.equal(harness.telegram.sentTexts().at(-1), "Controls ready.");
 

@@ -23,15 +23,20 @@ test("tracks and persists inFlight jobs across StateStore reloads", async () => 
   assert.equal(state2.inFlight["999"], undefined);
 });
 
-test("resetSession removes session and its settings completely", async () => {
+test("resetSession removes conversation history while preserving user settings by default", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "agy-state-reset-"));
   const file = path.join(directory, "state.json");
   const state = new StateStore(file);
   await state.load();
-  await state.setSession("456", { conversationId: "conv-xyz", settings: { model: "gemini-3.7-flash-low" } });
+  await state.setSession("456", { conversationId: "conv-xyz", settings: { model: "gemini-3.7-flash-low", continueSession: true } });
   assert.equal(state.session("456")?.settings?.model, "gemini-3.7-flash-low");
 
   await state.resetSession("456");
+  assert.equal(state.session("456")?.conversationId, undefined);
+  assert.equal(state.session("456")?.settings?.model, "gemini-3.7-flash-low");
+  assert.equal(state.session("456")?.settings?.continueSession, false);
+
+  await state.resetSession("456", false);
   assert.equal(state.session("456"), null);
 });
 
