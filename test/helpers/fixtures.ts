@@ -49,6 +49,7 @@ function configFor(env: Record<string, string>, dir: string): AppConfig {
     AGY_DB_PATH: path.join(dir, "conversation_summaries.db"),
     STATE_FILE: path.join(dir, "state.json"),
     TEMP_DIR: path.join(dir, "tmp"),
+    ENV_FILE: path.join(dir, ".env"),
     ...env,
   });
 }

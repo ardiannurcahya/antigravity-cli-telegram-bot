@@ -49,6 +49,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),
     tempDir: (env.TEMP_DIR || "/var/lib/agy-telegram/tmp").trim(), logLevel: (env.LOG_LEVEL || "info").trim(),
+    envFile: (env.ENV_FILE || env.AGY_ENV_FILE || path.join(os.homedir() || process.env.HOME || "/var/lib/agybot", ".config/agy-telegram/.env")).trim(),
   };
 }
 

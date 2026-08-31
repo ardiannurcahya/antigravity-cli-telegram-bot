@@ -130,6 +130,7 @@ export interface AppConfig {
   stateFile: string;
   tempDir: string;
   logLevel: string;
+  envFile?: string;
 }
 
 export interface StreamEvent extends Record<string, unknown> {

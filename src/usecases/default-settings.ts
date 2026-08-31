@@ -12,7 +12,7 @@ import type { ChatId, SessionSettings } from "../types.js";
 
 export async function persistDefaultSettings(context: AppContext, chatId: ChatId, messageId?: number): Promise<void> {
   const settings = settingsFor(context, chatId);
-  const envPath = path.join(os.homedir(), ".config/agy-telegram/.env");
+  const envPath = context.config.envFile || path.join(os.homedir(), ".config/agy-telegram/.env");
   try {
     let content = "";
     try {
