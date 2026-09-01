@@ -69,7 +69,6 @@ export interface SessionState {
   conversationTitle?: string;
   conversationStepCount?: number;
   conversationLastModifiedAt?: number | string;
-  topicRenamed?: boolean;
   settings?: Partial<SessionSettings>;
   lastRun?: RunStats;
   usageTotals?: Usage | null;
