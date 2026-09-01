@@ -12,6 +12,7 @@ import { reply, replyWithHtml } from "../ui/reply.js";
 import { showMain, showResumeMenu } from "../ui/screens.js";
 import { enqueueJob } from "../usecases/enqueue.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
+import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
@@ -36,8 +37,8 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     let mediaType: string | undefined;
     let fileId: string | undefined;
     let fileExt = ".jpg";
-    let isDoc = false;
     let isImage = false;
+    let isDoc = false;
     let isVoice = false;
     let isAudio = false;
     let isVideo = false;
@@ -96,11 +97,13 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       attachmentMeta = `[Animation attached: %PATH%${meta}]`;
     } else if (message.document) {
       fileId = message.document.file_id;
-      if (message.document.mime_type?.startsWith("image/")) {
+      const docName = message.document.file_name || "";
+      const mimeType = message.document.mime_type || "";
+      const isImageMime = mimeType.startsWith("image/");
+      const isImageExt = /\.(png|jpe?g|webp|gif|bmp)$/i.test(docName);
+      if (isImageMime || isImageExt) {
         isImage = true;
-        if (message.document.file_name && path.extname(message.document.file_name)) {
-          fileExt = path.extname(message.document.file_name);
-        }
+        fileExt = path.extname(docName) || (mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : ".jpg");
       } else {
         isDoc = true;
       }
@@ -108,20 +111,21 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
 
     if (fileId) {
       try {
-        await context.telegram.sendChatAction(sessionKey, "typing");
+        await context.telegram.sendChatAction(sessionKey, isImage ? "upload_photo" : "typing");
         const fileInfo = await context.telegram.getFile(fileId);
         if (fileInfo.file_path) {
+          const destDir = path.join(context.config.tempDir, `chat_${sessionKey}`);
           if (isImage) {
-            const dest = path.join(context.config.tempDir, `photo_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
+            const dest = path.join(destDir, `photo_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
             imagePath = await context.telegram.downloadFile(fileInfo.file_path, dest);
           } else if (isVoice) {
-            const dest = path.join(context.config.tempDir, `voice_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
+            const dest = path.join(destDir, `voice_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
           } else if (isVideoNote) {
-            const dest = path.join(context.config.tempDir, `vnote_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
+            const dest = path.join(destDir, `vnote_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
           } else if (isAnimation) {
-            const dest = path.join(context.config.tempDir, `anim_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
+            const dest = path.join(destDir, `anim_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
           } else if (isAudio) {
             const rawName = message.audio?.file_name || `audio_${Date.now()}_${fileId.slice(-8)}${fileExt}`;
@@ -145,6 +149,8 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
             documentPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
             documentName = cleanName;
           }
+        } else {
+          throw new Error("Telegram API did not provide a valid file path.");
         }
       } catch (err) {
         await reply(context, sessionKey, `Failed to download attachment: ${(err as Error).message}`, createMainKeyboard(settingsFor(context, sessionKey)));
@@ -202,6 +208,7 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     if (command.startsWith("/") && await handleCommand(context, message, command, parts.slice(1))) return;
     const buttonText = text;
     if (buttonText === "✨ New session" || buttonText === "✨ New") {
+      await cleanupSessionTempFiles(context.config.tempDir, sessionKey);
       await context.state.resetSession(sessionKey);
       await replyWithHtml(context, sessionKey, sessionInfoHtml(context, sessionKey), createMainKeyboard(settingsFor(context, sessionKey)));
       return;

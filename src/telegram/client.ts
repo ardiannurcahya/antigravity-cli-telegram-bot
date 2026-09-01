@@ -396,14 +396,19 @@ export class TelegramClient {
   public getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }> {
     return this.call("getFile", { file_id: fileId });
   }
-  public async downloadFile(filePath: string, destination: string, _signal?: AbortSignal): Promise<string> {
+  public async downloadFile(filePath: string, destination: string, signal?: AbortSignal): Promise<string> {
     const fileUrl = `https://api.telegram.org/file/bot${this.token}/${filePath}`;
-    const response = await fetch(fileUrl, { signal: AbortSignal.timeout(60000) });
-    if (!response.ok) throw new TelegramApiError(`Download file failed: ${response.statusText}`, response.status);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, buffer);
-    return destination;
+    return executeWithRetry(
+      async () => {
+        const response = await fetch(fileUrl, { signal: signal || AbortSignal.timeout(60000) });
+        if (!response.ok) throw new TelegramApiError(`Download file failed: ${response.statusText}`, response.status);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        await fs.mkdir(path.dirname(destination), { recursive: true });
+        await fs.writeFile(destination, buffer);
+        return destination;
+      },
+      { maxRetries: 3, initialDelayMs: 500, signal }
+    );
   }
 }
 

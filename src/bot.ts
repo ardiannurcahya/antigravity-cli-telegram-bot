@@ -11,6 +11,7 @@ import { enqueueJob } from "./usecases/enqueue.js";
 import { runPromptJob } from "./usecases/prompt-job.js";
 import { restartNoticePath } from "./usecases/self-update.js";
 import { handleUpdate } from "./router/updates.js";
+import { cleanupStaleTempFiles } from "./usecases/session-cleanup.js";
 import type { TelegramUpdate } from "./types.js";
 
 /**
@@ -150,6 +151,7 @@ export async function processUpdates(context: AppContext, updates: TelegramUpdat
 export function createBot(context: AppContext): { start(): Promise<void>; handleUpdate(update: TelegramUpdate): Promise<void> } {
   async function start(): Promise<void> {
     console.log(`agy-telegram started; workspace=${context.config.agy.workspace}; privateOnly=${context.config.telegram.privateOnly}`);
+    await cleanupStaleTempFiles(context.config.tempDir).catch((err) => console.error(`cleanupStaleTempFiles failed: ${(err as Error).message}`));
     await refreshModels(context).catch((error) => console.error(`refreshModels failed: ${(error as Error).message}`));
     await context.telegram.setMyCommands(BOT_COMMANDS).catch((error: unknown) => console.error(`setMyCommands failed: ${(error as Error).message}`));
 

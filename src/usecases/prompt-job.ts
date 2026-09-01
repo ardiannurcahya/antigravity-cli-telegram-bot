@@ -319,16 +319,5 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     clearInterval(heartbeatTimer);
     context.controllers.delete(controllerKey("prompt", job.chatId));
     clearSentImagePaths(job.chatId);
-    if (job.imagePath) {
-      await fs.unlink(job.imagePath).catch(() => undefined);
-    }
-    if (job.documentPath) {
-      await fs.unlink(job.documentPath).catch(() => undefined);
-    }
-    if (job.mediaPath) {
-      if (job.mediaPath.startsWith(context.config.tempDir) || job.mediaPath.startsWith(os.tmpdir())) {
-        await fs.unlink(job.mediaPath).catch(() => undefined);
-      }
-    }
   }
 }

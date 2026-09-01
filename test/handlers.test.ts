@@ -587,6 +587,52 @@ test("location, venue, and contact messages synthesize rich context into prompt"
   }
 });
 
+test("uncompressed image documents flow into the prompt queue with imagePath", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    harness.telegram.registerFile("doc_img_1", "documents/screenshot.png");
+    await handleUpdate(ctx, {
+      update_id: 10,
+      message: {
+        message_id: 14,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        caption: "check this uncompressed screenshot",
+        document: {
+          file_id: "doc_img_1",
+          file_name: "screenshot.png",
+          mime_type: "image/png",
+          file_size: 2048,
+        },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 1);
+    assert.equal(harness.capturedJobs[0].prompt, "check this uncompressed screenshot");
+    assert.match(harness.capturedJobs[0].imagePath ?? "", /\.png$/);
+    assert.ok(fs.existsSync(harness.capturedJobs[0].imagePath!));
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("/new command purges session temp images and files", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const sessionDir = path.join(ctx.config.tempDir, "chat_777");
+    await fs.promises.mkdir(sessionDir, { recursive: true });
+    await fs.promises.writeFile(path.join(sessionDir, "photo_temp.jpg"), "data");
+
+    await handleCommand(ctx, textUpdate(777, "").message!, "/new", []);
+    const exists = await fs.promises.stat(sessionDir).catch(() => null);
+    assert.equal(exists, null);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test("bot self-update and restart stay disabled unless explicitly allowed", async () => {
   const harness = createHarness({ ALLOW_BOT_UPDATE: "false" });
   const ctx = asAppContext(harness);

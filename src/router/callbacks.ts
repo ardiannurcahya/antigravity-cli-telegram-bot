@@ -17,6 +17,7 @@ import { runCustomAgy } from "../usecases/custom-agy.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
+import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import type { TelegramCallbackQuery } from "../types.js";
 import { authorizedCallback } from "./auth.js";
 import { parseCallbackAction } from "./callback-parser.js";
@@ -69,6 +70,7 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       await updateBot(context, chatId, messageId);
       return;
     case "new-session":
+      await cleanupSessionTempFiles(context.config.tempDir, chatId);
       await context.state.resetSession(chatId);
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
       await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));

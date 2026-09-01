@@ -20,6 +20,7 @@ import { enqueueJob } from "../usecases/enqueue.js";
 import { refreshModels, selectModel } from "../usecases/model-selection.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
+import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
 import type { ChatId, TelegramMessage } from "../types.js";
 
@@ -55,6 +56,7 @@ command("/help")(async ({ context, chatId }) => {
 });
 
 command("/new")(async ({ context, chatId }) => {
+  await cleanupSessionTempFiles(context.config.tempDir, chatId);
   await context.state.resetSession(chatId);
   await replyWithHtml(context, chatId, sessionInfoHtml(context, chatId), createMainKeyboard(settingsFor(context, chatId)));
 });
