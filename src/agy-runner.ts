@@ -18,6 +18,11 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
     finalPrompt = prompt.trim()
       ? `${prompt}\n\n[Document attached: ${overrides.documentPath}]`
       : `Please read and analyze this document: ${overrides.documentPath}`;
+  } else if (overrides.mediaPath && !prompt.includes(overrides.mediaPath)) {
+    const label = overrides.mediaType ? `${overrides.mediaType} attached` : "File attached";
+    finalPrompt = prompt.trim()
+      ? `${prompt}\n\n[${label}: ${overrides.mediaPath}]`
+      : `Please review and analyze this ${overrides.mediaType || "file"}: ${overrides.mediaPath}`;
   }
   const args = ["--print", finalPrompt, "--output-format", outputFormat, "--print-timeout", effective.printTimeout || `${Math.ceil(effective.timeoutMs / 1000)}s`];
   if (effective.project) args.push("--project", effective.project);
@@ -36,6 +41,7 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
   const dirs = new Set(effective.addDirs || []);
   if (overrides.imagePath) dirs.add(path.dirname(overrides.imagePath));
   if (overrides.documentPath) dirs.add(path.dirname(overrides.documentPath));
+  if (overrides.mediaPath) dirs.add(path.dirname(overrides.mediaPath));
   for (const addDir of dirs) args.push("--add-dir", addDir);
   if (effective.newProject) args.push("--new-project");
   if (effective.disableSlashCommands) args.push("--disable-slash-commands");

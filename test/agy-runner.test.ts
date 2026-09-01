@@ -123,3 +123,11 @@ test("attaches document file reference and directory in buildArgs", () => {
   assert.ok(args.includes("--add-dir"));
   assert.ok(args.includes("/tmp/workspace/uploads"));
 });
+
+test("attaches media file reference and directory in buildArgs", () => {
+  const args = buildArgs(config, "Transcribe this", null, { mediaPath: "/tmp/uploads/audio.mp3", mediaType: "Audio" });
+  assert.ok(args[1].includes("Transcribe this"));
+  assert.ok(args[1].includes("[Audio attached: /tmp/uploads/audio.mp3]"));
+  assert.ok(args.includes("--add-dir"));
+  assert.ok(args.includes("/tmp/uploads"));
+});

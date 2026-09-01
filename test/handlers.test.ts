@@ -436,6 +436,157 @@ test("photo messages download then flow into the prompt queue with imagePath", a
   }
 });
 
+test("voice messages download then flow into the prompt queue with mediaPath and metadata header", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    harness.telegram.registerFile("voice-id-1", "voice/voice.oga");
+    await handleUpdate(ctx, {
+      update_id: 3,
+      message: {
+        message_id: 7,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        voice: { file_id: "voice-id-1", duration: 15, mime_type: "audio/ogg" },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 1);
+    assert.equal(harness.capturedJobs[0].mediaType, "Voice message");
+    assert.match(harness.capturedJobs[0].mediaPath ?? "", /voice_\d+_ice-id-1\.ogg$/);
+    assert.match(harness.capturedJobs[0].prompt ?? "", /^\[Voice message attached: .*\/voice_.*\.ogg \| Duration: 15s\]$/);
+    assert.ok(fs.existsSync(harness.capturedJobs[0].mediaPath!));
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("audio messages download with title and performer into workspace uploads", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    harness.telegram.registerFile("audio-id-1", "music/song.mp3");
+    await handleUpdate(ctx, {
+      update_id: 4,
+      message: {
+        message_id: 8,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        caption: "Analyze this track",
+        audio: { file_id: "audio-id-1", duration: 180, title: "Bohemian Rhapsody", performer: "Queen", file_name: "queen.mp3" },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 1);
+    assert.equal(harness.capturedJobs[0].mediaType, "Audio");
+    assert.equal(harness.capturedJobs[0].documentName, "queen.mp3");
+    assert.match(harness.capturedJobs[0].prompt ?? "", /^\[Audio attached: .*queen\.mp3 \| Title: Bohemian Rhapsody \| Artist: Queen \| Duration: 180s\]\n\nAnalyze this track$/);
+    assert.ok(fs.existsSync(harness.capturedJobs[0].mediaPath!));
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("video and video note messages download and preserve metadata", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    harness.telegram.registerFile("vid-1", "video/clip.mp4");
+    await handleUpdate(ctx, {
+      update_id: 5,
+      message: {
+        message_id: 9,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        video: { file_id: "vid-1", width: 1920, height: 1080, duration: 45, file_name: "vacation.mp4" },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 1);
+    assert.equal(harness.capturedJobs[0].mediaType, "Video");
+    assert.match(harness.capturedJobs[0].prompt ?? "", /\[Video attached: .*vacation\.mp4 \| Resolution: 1920x1080 \| Duration: 45s\]/);
+
+    harness.capturedJobs[0].resolve();
+
+    harness.telegram.registerFile("vnote-1", "video/round.mp4");
+    await handleUpdate(ctx, {
+      update_id: 6,
+      message: {
+        message_id: 10,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        video_note: { file_id: "vnote-1", length: 360, duration: 8 },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 2);
+    assert.equal(harness.capturedJobs[1].mediaType, "Video note");
+    assert.match(harness.capturedJobs[1].prompt ?? "", /\[Video note attached: .*vnote_.*\.mp4 \| Duration: 8s\]/);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("location, venue, and contact messages synthesize rich context into prompt", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    await handleUpdate(ctx, {
+      update_id: 7,
+      message: {
+        message_id: 11,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        location: { latitude: 47.3769, longitude: 8.5417, horizontal_accuracy: 10 },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 1);
+    assert.match(harness.capturedJobs[0].prompt ?? "", /\[Location shared: Coordinates 47\.3769, 8\.5417 \| Accuracy: 10m\]/);
+
+    harness.capturedJobs[0].resolve();
+
+    await handleUpdate(ctx, {
+      update_id: 8,
+      message: {
+        message_id: 12,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        venue: {
+          location: { latitude: 47.378, longitude: 8.54 },
+          title: "Zurich HB",
+          address: "Bahnhofplatz 1, 8001 Zurich",
+        },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 2);
+    assert.match(harness.capturedJobs[1].prompt ?? "", /\[Location shared: "Zurich HB", Bahnhofplatz 1, 8001 Zurich \(Coordinates: 47\.378, 8\.54\)\]/);
+
+    harness.capturedJobs[1].resolve();
+
+    await handleUpdate(ctx, {
+      update_id: 9,
+      message: {
+        message_id: 13,
+        chat: { id: 777, type: "private" },
+        from: { id: 111 },
+        contact: {
+          phone_number: "+41791234567",
+          first_name: "Stephan",
+          last_name: "Bolten",
+          vcard: "BEGIN:VCARD\nVERSION:3.0\nFN:Stephan Bolten\nTEL:+41791234567\nEND:VCARD",
+        },
+      },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(harness.capturedJobs.length, 3);
+    assert.match(harness.capturedJobs[2].prompt ?? "", /\[Contact shared: Stephan Bolten \(\+41791234567\) \| vCard saved: .*contact_.*\.vcf\]/);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test("bot self-update and restart stay disabled unless explicitly allowed", async () => {
   const harness = createHarness({ ALLOW_BOT_UPDATE: "false" });
   const ctx = asAppContext(harness);

@@ -37,6 +37,8 @@ export function enqueueJob(context: AppContext, chatId: ChatId, job: Partial<Que
     imagePath: job.imagePath,
     documentPath: job.documentPath,
     documentName: job.documentName,
+    mediaPath: job.mediaPath,
+    mediaType: job.mediaType,
   });
   if (!result.accepted) {
     void reply(context, chatId, "Queue is full. Try again shortly.", createMainKeyboard(settingsFor(context, chatId)));

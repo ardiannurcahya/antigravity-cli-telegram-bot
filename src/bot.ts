@@ -119,6 +119,8 @@ export async function resumeInterruptedJobs(context: AppContext): Promise<void> 
           imagePath: job.imagePath,
           documentPath: job.documentPath,
           documentName: job.documentName,
+          mediaPath: job.mediaPath,
+          mediaType: job.mediaType,
         });
       } else {
         await context.telegram.sendMessage(

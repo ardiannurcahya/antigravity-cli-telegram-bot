@@ -5,6 +5,14 @@ export interface TelegramUser { id: number }
 export interface TelegramChat { id: number; type?: string }
 export interface TelegramPhotoSize { file_id: string; file_unique_id: string; width: number; height: number; file_size?: number }
 export interface TelegramDocument { file_id: string; file_name?: string; mime_type?: string; file_size?: number }
+export interface TelegramVoice { file_id: string; duration: number; mime_type?: string; file_size?: number }
+export interface TelegramAudio { file_id: string; duration: number; performer?: string; title?: string; file_name?: string; mime_type?: string; file_size?: number }
+export interface TelegramVideo { file_id: string; width: number; height: number; duration: number; file_name?: string; mime_type?: string; file_size?: number }
+export interface TelegramVideoNote { file_id: string; length: number; duration: number; file_size?: number }
+export interface TelegramAnimation { file_id: string; width: number; height: number; duration: number; file_name?: string; mime_type?: string; file_size?: number }
+export interface TelegramLocation { latitude: number; longitude: number; horizontal_accuracy?: number }
+export interface TelegramVenue { location: TelegramLocation; title: string; address: string; foursquare_id?: string; foursquare_type?: string }
+export interface TelegramContact { phone_number: string; first_name: string; last_name?: string; user_id?: number; vcard?: string }
 export interface TelegramMessage {
   message_id: number;
   message_thread_id?: number;
@@ -15,6 +23,14 @@ export interface TelegramMessage {
   caption?: string;
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
+  voice?: TelegramVoice;
+  audio?: TelegramAudio;
+  video?: TelegramVideo;
+  video_note?: TelegramVideoNote;
+  animation?: TelegramAnimation;
+  location?: TelegramLocation;
+  venue?: TelegramVenue;
+  contact?: TelegramContact;
 }
 export interface TelegramCallbackQuery { id: string; from: TelegramUser; data?: string; message?: TelegramMessage }
 export interface TelegramUpdate { update_id: number; message?: TelegramMessage; callback_query?: TelegramCallbackQuery }
@@ -89,6 +105,8 @@ export interface InFlightJob {
   imagePath?: string;
   documentPath?: string;
   documentName?: string;
+  mediaPath?: string;
+  mediaType?: string;
   startedAt: number;
 }
 
@@ -177,4 +195,6 @@ export interface RunnerOptions {
   imagePath?: string;
   documentPath?: string;
   documentName?: string;
+  mediaPath?: string;
+  mediaType?: string;
 }

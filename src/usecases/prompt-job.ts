@@ -191,6 +191,8 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         imagePath: job.imagePath,
         documentPath: job.documentPath,
         documentName: job.documentName,
+        mediaPath: job.mediaPath,
+        mediaType: job.mediaType,
         startedAt: Date.now(),
       });
       result = await runAgy(context.config.agy, job.prompt || "", session?.conversationId || null, {
@@ -199,6 +201,8 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         imagePath: job.imagePath,
         documentPath: job.documentPath,
         documentName: job.documentName,
+        mediaPath: job.mediaPath,
+        mediaType: job.mediaType,
         onEvent: (event: StreamEvent) => {
           lastEventReceivedAt = Date.now();
           const step = event.step_update as Record<string, unknown> | undefined;
@@ -320,6 +324,11 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     }
     if (job.documentPath) {
       await fs.unlink(job.documentPath).catch(() => undefined);
+    }
+    if (job.mediaPath) {
+      if (job.mediaPath.startsWith(context.config.tempDir) || job.mediaPath.startsWith(os.tmpdir())) {
+        await fs.unlink(job.mediaPath).catch(() => undefined);
+      }
     }
   }
 }

@@ -9,6 +9,8 @@ export interface QueueJob {
   imagePath?: string;
   documentPath?: string;
   documentName?: string;
+  mediaPath?: string;
+  mediaType?: string;
 }
 export interface QueueStatus { active: (QueueJob & { cancel: () => boolean }) | null; queued: number; totalQueued: number }
 type Worker = (job: QueueJob, isCancelled: () => boolean) => Promise<void>;
