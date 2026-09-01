@@ -22,7 +22,7 @@ test("callback parser decodes every wire format the keyboards emit", () => {
   assert.deepEqual(parseCallbackAction("action:cancel"), { kind: "cancel" });
   assert.deepEqual(parseCallbackAction("cli:version"), { kind: "cli", command: "version" });
   assert.deepEqual(parseCallbackAction("toggle:disable-slash"), { kind: "toggle", option: "disable-slash" });
-  assert.deepEqual(parseCallbackAction("set:model:gemini-3.5-flash-high"), { kind: "set", key: "model", value: "gemini-3.5-flash-high" });
+  assert.deepEqual(parseCallbackAction("set:model:gemini-3.7-flash-high"), { kind: "set", key: "model", value: "gemini-3.7-flash-high" });
   assert.deepEqual(parseCallbackAction("set:sandbox:off"), { kind: "set", key: "sandbox", value: "off" });
 });
 

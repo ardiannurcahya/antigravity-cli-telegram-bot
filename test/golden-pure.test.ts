@@ -41,7 +41,7 @@ test("golden: buildArgs injects attachment notes and add-dir for image and docum
 test("golden: buildArgs skips effort for claude models and effort-suffixed models", () => {
   const claude = buildArgs({ ...baseConfig }, "go", null, { model: "claude-sonnet-4-6", effort: "low" });
   assert.ok(!claude.includes("--effort"));
-  const suffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-3.5-flash-medium", effort: "low" });
+  const suffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-3.7-flash-medium", effort: "low" });
   assert.ok(!suffixed.includes("--effort"));
 });
 
@@ -53,7 +53,7 @@ test("golden: parseCommandArgs handles quotes, escapes, and rejects unclosed quo
 
 test("golden: parseStreamOutput extracts response, usage, conversation id and tool calls", () => {
   const stdout = [
-    JSON.stringify({ event: "init", init: { model: "gemini-3.5-flash-high" }, conversationId: "abc-123" }),
+    JSON.stringify({ event: "init", init: { model: "gemini-3.7-flash-high" }, conversationId: "abc-123" }),
     JSON.stringify({ event: "step_update", step_update: { step_type: "tool", tool_info: { name: "view_file", parameters: { path: "/x/y.ts" } }, usage: { input_tokens: 10 } } }),
     JSON.stringify({ event: "step_update", step_update: { text_delta: "Hel" } }),
     JSON.stringify({ event: "step_update", step_update: { text_delta: "lo" } }),
@@ -62,7 +62,7 @@ test("golden: parseStreamOutput extracts response, usage, conversation id and to
   const result = parseStreamOutput(stdout);
   assert.equal(result.text, "Hello!");
   assert.equal(result.conversationId, "abc-123");
-  assert.equal(result.model, "gemini-3.5-flash-high");
+  assert.equal(result.model, "gemini-3.7-flash-high");
   assert.equal(result.toolCalls, 1);
   assert.equal(result.numTurns, 2);
   assert.equal(result.durationMs, 2500);

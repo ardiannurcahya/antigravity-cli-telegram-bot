@@ -356,13 +356,11 @@ and models outside the configured model allowlist.
 The built-in model allowlist currently includes:
 
 - `gemini-3.7-flash-high`
-
+- `gemini-3.7-flash-medium`
+- `gemini-3.7-flash-low`
 - `gemini-3.6-flash-high`
 - `gemini-3.6-flash-medium`
 - `gemini-3.6-flash-low`
-- `gemini-3.5-flash-high`
-- `gemini-3.5-flash-medium`
-- `gemini-3.5-flash-low`
 - `gemini-3.1-pro-high`
 - `gemini-3.1-pro-low`
 - `claude-sonnet-4-6`
