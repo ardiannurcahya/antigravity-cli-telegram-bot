@@ -1,8 +1,17 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
 import type { ConversationSummary } from "./types.js";
+
+const require = createRequire(import.meta.url);
+let DatabaseSyncClass: any = null;
+try {
+  const sqlite = require("node:sqlite");
+  DatabaseSyncClass = sqlite.DatabaseSync;
+} catch {
+  DatabaseSyncClass = null;
+}
 
 export function resolveEffectiveDbPath(configuredPath?: string): string {
   if (configuredPath && configuredPath.trim()) {
@@ -80,11 +89,11 @@ export class ConversationDatabase {
   public getConversations(page = 0, pageSize = 10): ConversationPage {
     const normalizedPageSize = Math.max(1, pageSize);
     const emptyResult: ConversationPage = { items: [], total: 0, page: 0, totalPages: 1 };
-    if (!fs.existsSync(this.dbPath)) return emptyResult;
+    if (!DatabaseSyncClass || !fs.existsSync(this.dbPath)) return emptyResult;
 
-    let db: DatabaseSync | null = null;
+    let db: any = null;
     try {
-      db = new DatabaseSync(this.dbPath, { readOnly: true });
+      db = new DatabaseSyncClass(this.dbPath, { readOnly: true });
       const countStmt = db.prepare(
         "SELECT COUNT(*) as total FROM conversation_summaries WHERE killed = 0 AND step_count > 0;"
       );
@@ -121,7 +130,7 @@ export class ConversationDatabase {
     }
   }
 
-  private ensureTable(db: DatabaseSync): void {
+  private ensureTable(db: any): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS conversation_summaries (
         conversation_id text PRIMARY KEY,
@@ -156,11 +165,11 @@ export class ConversationDatabase {
     project_id?: string;
     workspace_uris?: string;
   }): void {
-    if (!summary.conversation_id || !isUuid(summary.conversation_id)) return;
+    if (!DatabaseSyncClass || !summary.conversation_id || !isUuid(summary.conversation_id)) return;
     try {
       const dir = path.dirname(this.dbPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const db = new DatabaseSync(this.dbPath);
+      const db = new DatabaseSyncClass(this.dbPath);
       this.ensureTable(db);
       const isoTime = typeof summary.last_modified_time === "number"
         ? new Date(summary.last_modified_time).toISOString()
@@ -203,10 +212,10 @@ export class ConversationDatabase {
   }
 
   public getConversationById(id: string): ConversationSummary | null {
-    if (!id || !fs.existsSync(this.dbPath)) return null;
-    let db: DatabaseSync | null = null;
+    if (!DatabaseSyncClass || !id || !fs.existsSync(this.dbPath)) return null;
+    let db: any = null;
     try {
-      db = new DatabaseSync(this.dbPath, { readOnly: true });
+      db = new DatabaseSyncClass(this.dbPath, { readOnly: true });
       const stmt = db.prepare(`
         SELECT
           conversation_id,

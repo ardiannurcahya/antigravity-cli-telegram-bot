@@ -529,7 +529,7 @@ function formatInlineHtml(value: string): string {
     const cleanLabel = label.replace(/^`+|`+$/g, "");
     return token(`<a href="${url}">${cleanLabel}</a>`);
   });
-  escaped = escaped.replace(/\[([^\]]+)\]\(file:\/\/\/[^\s)]+\)/g, (_match, label: string) => {
+  escaped = escaped.replace(/\[([^\]]+)\]\((?:file|conversation):\/\/[^\s)]+\)/g, (_match, label: string) => {
     const cleanLabel = label.replace(/^`+|`+$/g, "");
     return token(`<code>${cleanLabel}</code>`);
   });
@@ -541,7 +541,15 @@ function formatInlineHtml(value: string): string {
   escaped = escaped.replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_match, boldA: string | undefined, boldB: string | undefined) => `<b>${boldA || boldB}</b>`);
   escaped = escaped.replace(/~~(.+?)~~/g, "<s>$1</s>");
   escaped = escaped.replace(/\*([^*\n]+)\*|_([^_\n]+)_/g, (_match, italicA: string | undefined, italicB: string | undefined) => `<i>${italicA || italicB}</i>`);
-  return escaped.replace(/\u0000(\d+)\u0000/g, (_match, index: string) => tokens[Number(index)] || "");
+
+  let prev: string | undefined;
+  let iterations = 0;
+  while (escaped !== prev && /\u0000\d+\u0000/.test(escaped) && iterations < 10) {
+    prev = escaped;
+    escaped = escaped.replace(/\u0000(\d+)\u0000/g, (_match, index: string) => tokens[Number(index)] || "");
+    iterations += 1;
+  }
+  return escaped;
 }
 
 export function escapeHtml(value: string): string {

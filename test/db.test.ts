@@ -3,8 +3,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
 import { ConversationDatabase, formatRelativeTime, isUuid, parseTimestamp } from "../src/db.js";
+
+const require = createRequire(import.meta.url);
+let DatabaseSync: any = null;
+try {
+  DatabaseSync = require("node:sqlite").DatabaseSync;
+} catch {
+  DatabaseSync = null;
+}
 
 test("isUuid validates standard UUID strings", () => {
   assert.equal(isUuid("123e4567-e89b-12d3-a456-426614174000"), true);
@@ -55,7 +63,8 @@ test("ConversationDatabase returns empty page for non-existent database file", (
   assert.equal(db.getConversationById("123"), null);
 });
 
-test("ConversationDatabase queries, paginates, and filters killed/0-step conversations", () => {
+test("ConversationDatabase correctly reads, counts, orders, and paginates conversation records", () => {
+  if (!DatabaseSync) return;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-test-db-"));
   const dbFile = path.join(tmpDir, "conversation_summaries.db");
 
@@ -123,6 +132,7 @@ test("ConversationDatabase queries, paginates, and filters killed/0-step convers
 });
 
 test("ConversationDatabase upsertConversation correctly inserts and updates sessions", () => {
+  if (!DatabaseSync) return;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-test-upsert-"));
   const dbFile = path.join(tmpDir, "conversation_summaries.db");
 

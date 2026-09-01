@@ -90,7 +90,7 @@ export function parseCommandArgs(input: string): string[] {
   return args;
 }
 
-const TOP_LEVEL_COMMANDS = new Set(["agent", "agents", "changelog", "help", "install", "models", "plugin", "plugins", "update"]);
+export const TOP_LEVEL_COMMANDS = new Set(["agent", "agents", "changelog", "help", "install", "mcp", "mic-serve", "models", "plugin", "plugins", "update"]);
 
 export function validateCustomArgs(args: string[]): string | null {
   if (args.length === 0) return "Usage: /agy <agy arguments>. Example: /agy --print \"Explain this project\" --output-format text";
@@ -98,7 +98,10 @@ export function validateCustomArgs(args: string[]): string | null {
   const first = args[0];
   if (first && TOP_LEVEL_COMMANDS.has(first)) return null;
   if (["--help", "-h", "--version", "-v"].includes(first || "")) return null;
-  if (!args.includes("--print") && !args.includes("-p") && !args.includes("--prompt")) return "Custom AGY commands must use --print, -p, or --prompt so they do not open an unmanaged interactive terminal.";
+  if (!args.includes("--print") && !args.includes("-p") && !args.includes("--prompt")) {
+    if (first && !first.startsWith("-")) return null;
+    return "Custom AGY commands must use --print, -p, or --prompt so they do not open an unmanaged interactive terminal.";
+  }
   return null;
 }
 

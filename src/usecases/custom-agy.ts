@@ -1,4 +1,4 @@
-import { runAgyCommand, validateCustomArgs } from "../agy-runner.js";
+import { runAgyCommand, validateCustomArgs, TOP_LEVEL_COMMANDS } from "../agy-runner.js";
 import type { AppContext } from "../context.js";
 import { controllerKey } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
@@ -14,8 +14,13 @@ export function isDangerousCustomCommand(args: string[]): boolean {
 }
 
 function customArgsForExecution(context: AppContext, args: string[]): string[] {
-  const isPrintCommand = args.includes("--print") || args.includes("-p") || args.includes("--prompt");
-  const executionArgs = [...args];
+  let isPrintCommand = args.includes("--print") || args.includes("-p") || args.includes("--prompt");
+  let executionArgs = [...args];
+  const first = args[0] || "";
+  if (!isPrintCommand && !TOP_LEVEL_COMMANDS.has(first) && !["--help", "-h", "--version", "-v"].includes(first)) {
+    executionArgs = ["--print", args.join(" ")];
+    isPrintCommand = true;
+  }
   if (isPrintCommand && context.config.agy.sandbox && !context.config.agy.allowSandboxDisable && !executionArgs.includes("--sandbox")) executionArgs.push("--sandbox");
   return executionArgs;
 }

@@ -3,11 +3,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
 import { runPtyCommand, parseUsageQuota, parseCredits } from "../src/pty-runner.js";
 import { ConversationDatabase, formatRelativeTime, isUuid } from "../src/db.js";
 import { splitPreformattedHtml } from "../src/telegram.js";
 import type { AgyConfig } from "../src/types.js";
+
+const require = createRequire(import.meta.url);
+let DatabaseSync: any = null;
+try {
+  DatabaseSync = require("node:sqlite").DatabaseSync;
+} catch {
+  DatabaseSync = null;
+}
 
 test("smoke test: full interactive PTY execution with chunked output, prompt readiness, \\r input, and quota extraction", async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-smoke-test-"));
@@ -180,6 +188,7 @@ while True:
 });
 
 test("smoke test: realistic SQLite pagination, UUID lookup, and relative dates across 25 sessions", () => {
+  if (!DatabaseSync) return;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-db-smoke-"));
   const dbFile = path.join(tmpDir, "conversation_summaries.db");
 
@@ -245,4 +254,29 @@ test("smoke test: realistic SQLite pagination, UUID lookup, and relative dates a
   assert.equal(item.step_count, 5);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test("formatTelegramHtml handles conversation:// and file:// links cleanly without backtick artifacts", async () => {
+  const { formatTelegramHtml } = await import("../src/telegram/markdown-renderer.js");
+  const markdown = "Consultez [utils.py](file:///path/to/utils.py) ou [`Conversation`](conversation://12345-abcde) pour les détails.";
+  const formatted = formatTelegramHtml(markdown);
+
+  assert.match(formatted, /<code>utils\.py<\/code>/);
+  assert.match(formatted, /<code>Conversation<\/code>/);
+  assert.doesNotMatch(formatted, /<a href="conversation/);
+  assert.doesNotMatch(formatted, /<a href="file/);
+  assert.doesNotMatch(formatted, /`<code>/);
+});
+
+test("TOP_LEVEL_COMMANDS includes mic-serve and mcp, and validateCustomArgs supports freeform prompts", async () => {
+  const { TOP_LEVEL_COMMANDS, validateCustomArgs } = await import("../src/agy-runner.js");
+  assert.equal(TOP_LEVEL_COMMANDS.has("mic-serve"), true);
+  assert.equal(TOP_LEVEL_COMMANDS.has("mcp"), true);
+  assert.equal(TOP_LEVEL_COMMANDS.has("models"), true);
+
+  assert.equal(validateCustomArgs(["mic-serve"]), null);
+  assert.equal(validateCustomArgs(["models"]), null);
+  assert.equal(validateCustomArgs(["Explain", "this", "code"]), null);
+  assert.equal(validateCustomArgs(["--print", "hello"]), null);
+  assert.match(validateCustomArgs(["--prompt-interactive"]) || "", /requires a local TTY/);
 });
