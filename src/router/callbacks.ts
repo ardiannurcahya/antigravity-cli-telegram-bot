@@ -21,12 +21,18 @@ import type { TelegramCallbackQuery } from "../types.js";
 import { authorizedCallback } from "./auth.js";
 import { parseCallbackAction } from "./callback-parser.js";
 
+export function sessionKeyForCallback(callback: TelegramCallbackQuery): string {
+  const msg = callback.message;
+  if (!msg) return String(callback.from.id);
+  return msg.message_thread_id ? `${msg.chat.id}:${msg.message_thread_id}` : String(msg.chat.id);
+}
+
 export async function handleCallback(context: AppContext, callback: TelegramCallbackQuery): Promise<void> {
   if (!authorizedCallback(context.config, callback) || !callback.message || !callback.data) return;
   const action = parseCallbackAction(callback.data);
   if (!action) return;
 
-  const chatId = callback.message.chat.id;
+  const chatId = sessionKeyForCallback(callback);
   const messageId = callback.message.message_id;
   await context.telegram.answerCallbackQuery(callback.id).catch(() => undefined);
   if (action.kind === "noop") return;

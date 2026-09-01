@@ -20,6 +20,7 @@ import type { TelegramUpdate } from "./types.js";
 export function createAppServices(base: BaseServices): AppContext {
   const services = { ...base, controllers: new Map<string, AbortController>(), pendingDangerousCommands: new Map<string, string[]>() } as AppContext;
   const queue = new JobQueue(base.config.queue.maxSize, (job, isCancelled) => runPromptJob(services, job, isCancelled), {
+    maxConcurrent: 4,
     onCancel: (chatId) => {
       services.controllers.get(controllerKey("prompt", chatId))?.abort();
       services.controllers.get(controllerKey("custom", chatId))?.abort();

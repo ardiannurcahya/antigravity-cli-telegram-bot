@@ -15,13 +15,19 @@ import { runCustomAgy } from "../usecases/custom-agy.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
-import type { SessionSettings, TelegramUpdate } from "../types.js";
+import type { SessionSettings, TelegramMessage, TelegramUpdate } from "../types.js";
+
+export function sessionKeyForMessage(message: TelegramMessage): string {
+  return message.message_thread_id ? `${message.chat.id}:${message.message_thread_id}` : String(message.chat.id);
+}
 
 export async function handleUpdate(context: AppContext, update: TelegramUpdate): Promise<void> {
   try {
     if (update.callback_query) { await handleCallback(context, update.callback_query); return; }
     const message = update.message;
     if (!message || !authorizedMessage(context.config, message)) return;
+
+    const sessionKey = sessionKeyForMessage(message);
 
     let imagePath: string | undefined;
     let documentPath: string | undefined;
@@ -45,7 +51,7 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
 
     if (fileId) {
       try {
-        await context.telegram.sendChatAction(message.chat.id, "typing");
+        await context.telegram.sendChatAction(sessionKey, "typing");
         const fileInfo = await context.telegram.getFile(fileId);
         if (fileInfo.file_path) {
           if (isDoc && message.document) {
@@ -61,7 +67,7 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
           }
         }
       } catch (err) {
-        await reply(context, message.chat.id, `Failed to download attachment: ${(err as Error).message}`, createMainKeyboard(settingsFor(context, message.chat.id)));
+        await reply(context, sessionKey, `Failed to download attachment: ${(err as Error).message}`, createMainKeyboard(settingsFor(context, sessionKey)));
         return;
       }
     }
@@ -71,29 +77,29 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
 
     const parts = text.split(/\s+/);
     const command = parts[0] ? parts[0].toLowerCase().split("@")[0].replace(/_/g, "-") : "";
-    if (command === "/agy") { try { void runCustomAgy(context, message.chat.id, parseCommandArgs(text.slice(parts[0].length))); } catch (error) { await reply(context, message.chat.id, `Invalid /agy command: ${(error as Error).message}`, createMainKeyboard(settingsFor(context, message.chat.id))); } return; }
+    if (command === "/agy") { try { void runCustomAgy(context, sessionKey, parseCommandArgs(text.slice(parts[0].length))); } catch (error) { await reply(context, sessionKey, `Invalid /agy command: ${(error as Error).message}`, createMainKeyboard(settingsFor(context, sessionKey))); } return; }
     if (command.startsWith("/") && await handleCommand(context, message, command, parts.slice(1))) return;
     const buttonText = text;
     if (buttonText === "✨ New session" || buttonText === "✨ New") {
-      await context.state.resetSession(message.chat.id);
-      await replyWithHtml(context, message.chat.id, sessionInfoHtml(context, message.chat.id), createMainKeyboard(settingsFor(context, message.chat.id)));
+      await context.state.resetSession(sessionKey);
+      await replyWithHtml(context, sessionKey, sessionInfoHtml(context, sessionKey), createMainKeyboard(settingsFor(context, sessionKey)));
       return;
     }
     if (buttonText === "🛑 Stop" || buttonText === "🛑 Cancel" || buttonText === "Stop" || buttonText === "Cancel") {
-      context.pendingDangerousCommands.delete(String(message.chat.id));
-      context.controllers.get(controllerKey("prompt", message.chat.id))?.abort();
-      context.controllers.get(controllerKey("custom", message.chat.id))?.abort();
-      const result = context.queue.cancelForChat(message.chat.id);
-      await reply(context, message.chat.id, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, message.chat.id)));
+      context.pendingDangerousCommands.delete(String(sessionKey));
+      context.controllers.get(controllerKey("prompt", sessionKey))?.abort();
+      context.controllers.get(controllerKey("custom", sessionKey))?.abort();
+      const result = context.queue.cancelForChat(sessionKey);
+      await reply(context, sessionKey, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, sessionKey)));
       return;
     }
-    if (buttonText === "🤖 Model") { await reply(context, message.chat.id, "Select a model:", modelKeyboard(context, message.chat.id)); return; }
+    if (buttonText === "🤖 Model") { await reply(context, sessionKey, "Select a model:", modelKeyboard(context, sessionKey)); return; }
     if (buttonText === "📊 Quota" || buttonText === "📊 Usage / Quota" || buttonText === "📊 Usage") {
-      enqueueJob(context, message.chat.id, { kind: "usage" });
+      enqueueJob(context, sessionKey, { kind: "usage" });
       return;
     }
-    if (text.startsWith("/")) { await reply(context, message.chat.id, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, message.chat.id))); return; }
-    enqueueJob(context, message.chat.id, { prompt: text, kind: "prompt", imagePath, documentPath, documentName });
+    if (text.startsWith("/")) { await reply(context, sessionKey, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, sessionKey))); return; }
+    enqueueJob(context, sessionKey, { prompt: text, kind: "prompt", imagePath, documentPath, documentName });
   } catch (error) {
     console.error("handleUpdate error:", error);
   }

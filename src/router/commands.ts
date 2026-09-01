@@ -21,12 +21,12 @@ import { refreshModels, selectModel } from "../usecases/model-selection.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
-import type { TelegramMessage } from "../types.js";
+import type { ChatId, TelegramMessage } from "../types.js";
 
 interface CommandInput {
   context: AppContext;
   message: TelegramMessage;
-  chatId: TelegramMessage["chat"]["id"];
+  chatId: ChatId;
   args: string[];
   command: string;
 }
@@ -370,7 +370,8 @@ command("/agy-confirm")(async ({ context, chatId }) => {
 export async function handleCommand(context: AppContext, message: TelegramMessage, command: string, args: string[]): Promise<boolean> {
   const handler = registry.get(command);
   if (!handler) return false;
-  await handler({ context, message, chatId: message.chat.id, args, command });
+  const sessionKey = message.message_thread_id ? `${message.chat.id}:${message.message_thread_id}` : String(message.chat.id);
+  await handler({ context, message, chatId: sessionKey, args, command });
   return true;
 }
 

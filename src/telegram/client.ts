@@ -124,6 +124,17 @@ export function isRetryableTransportErrorMessage(message: string): boolean {
     false;
 }
 
+export function parseChatTarget(chatId: ChatId): { chatId: number | string; messageThreadId?: number } {
+  if (typeof chatId === "string" && chatId.includes(":")) {
+    const [rawChat, rawThread] = chatId.split(":");
+    const threadId = parseInt(rawThread, 10);
+    if (!isNaN(threadId)) {
+      return { chatId: isNaN(Number(rawChat)) ? rawChat : Number(rawChat), messageThreadId: threadId };
+    }
+  }
+  return { chatId };
+}
+
 export class TelegramClient {
   private readonly root: string;
   public constructor(private readonly token: string) { this.root = API_ROOT(token); }
@@ -198,7 +209,14 @@ export class TelegramClient {
   }
   public getUpdates(offset: number, signal?: AbortSignal): Promise<TelegramUpdate[]> { return this.call("getUpdates", { offset, timeout: 30, allowed_updates: ["message", "callback_query"] }, signal); }
   public sendMessage(chatId: ChatId, text: string, replyMarkup?: ReplyMarkup, parseMode?: TelegramParseMode): Promise<{ message_id: number }> {
-    return this.call<{ message_id: number }>("sendMessage", { chat_id: chatId, text, ...(parseMode ? { parse_mode: parseMode } : {}), ...(replyMarkup ? { reply_markup: replyMarkup } : {}) });
+    const target = parseChatTarget(chatId);
+    return this.call<{ message_id: number }>("sendMessage", {
+      chat_id: target.chatId,
+      ...(target.messageThreadId !== undefined ? { message_thread_id: target.messageThreadId } : {}),
+      text,
+      ...(parseMode ? { parse_mode: parseMode } : {}),
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
   }
   public async editMessageText(
     chatId: ChatId,
@@ -207,9 +225,10 @@ export class TelegramClient {
     replyMarkup?: InlineKeyboardMarkup,
     parseMode?: TelegramParseMode
   ): Promise<void> {
+    const target = parseChatTarget(chatId);
     try {
       await this.call("editMessageText", {
-        chat_id: chatId,
+        chat_id: target.chatId,
         message_id: messageId,
         text,
         ...(parseMode ? { parse_mode: parseMode } : {}),
@@ -221,19 +240,58 @@ export class TelegramClient {
     }
   }
   public async deleteMessage(chatId: ChatId, messageId: number): Promise<boolean> {
+    const target = parseChatTarget(chatId);
     try {
-      return await this.call<boolean>("deleteMessage", { chat_id: chatId, message_id: messageId }, undefined, 0);
+      return await this.call<boolean>("deleteMessage", { chat_id: target.chatId, message_id: messageId }, undefined, 0);
     } catch {
       return false;
     }
   }
   public answerCallbackQuery(callbackQueryId: string, text?: string): Promise<boolean> { return this.call<boolean>("answerCallbackQuery", { callback_query_id: callbackQueryId, ...(text ? { text } : {}) }, undefined, 0).catch(() => false); }
   public setMyCommands(commands: Array<{ command: string; description: string }>): Promise<boolean> { return this.call<boolean>("setMyCommands", { commands }); }
-  public sendChatAction(chatId: ChatId, action = "typing"): Promise<boolean> { return this.call<boolean>("sendChatAction", { chat_id: chatId, action }, undefined, 0).catch(() => false); }
+  public async editForumTopic(chatId: number | string, messageThreadId: number, name: string): Promise<boolean> {
+    try {
+      if (messageThreadId === 1) {
+        return await this.call<boolean>("editGeneralForumTopic", {
+          chat_id: chatId,
+          name: name.slice(0, 128),
+        }, undefined, 0);
+      }
+      return await this.call<boolean>("editForumTopic", {
+        chat_id: chatId,
+        message_thread_id: messageThreadId,
+        name: name.slice(0, 128),
+      }, undefined, 0);
+    } catch (error) {
+      try {
+        return await this.call<boolean>("editGeneralForumTopic", {
+          chat_id: chatId,
+          name: name.slice(0, 128),
+        }, undefined, 0);
+      } catch {
+        console.warn("[telegram] Failed to edit forum topic %s: %s", String(messageThreadId), (error as Error).message);
+        return false;
+      }
+    }
+  }
+  public sendChatAction(chatId: ChatId, action = "typing"): Promise<boolean> {
+    const target = parseChatTarget(chatId);
+    return this.call<boolean>("sendChatAction", {
+      chat_id: target.chatId,
+      ...(target.messageThreadId !== undefined ? { message_thread_id: target.messageThreadId } : {}),
+      action,
+    }, undefined, 0).catch(() => false);
+  }
   public async sendDocument(chatId: ChatId, filename: string, content: string, _signal?: AbortSignal, maxRetries = 3): Promise<unknown> {
+    const target = parseChatTarget(chatId);
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       try {
-        const form = new FormData(); form.append("chat_id", String(chatId)); form.append("document", new Blob([content], { type: "text/markdown" }), filename);
+        const form = new FormData();
+        form.append("chat_id", String(target.chatId));
+        if (target.messageThreadId !== undefined) {
+          form.append("message_thread_id", String(target.messageThreadId));
+        }
+        form.append("document", new Blob([content], { type: "text/markdown" }), filename);
         const response = await fetch(`${this.root}/sendDocument`, { method: "POST", body: form, signal: AbortSignal.timeout(45000) });
         const body = await response.json() as { ok: boolean; result?: unknown; description?: string; error_code?: number; parameters?: { retry_after?: number } };
         if (response.ok && body.ok) return body.result;
@@ -254,10 +312,14 @@ export class TelegramClient {
     throw new Error("Telegram sendDocument failed: max retries reached");
   }
   public async sendPhoto(chatId: ChatId, photoPath: string | Buffer, caption?: string, parseMode?: TelegramParseMode, mimeType?: string, replyMarkup?: ReplyMarkup, _signal?: AbortSignal, maxRetries = 3): Promise<unknown> {
+    const target = parseChatTarget(chatId);
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       try {
         const form = new FormData();
-        form.append("chat_id", String(chatId));
+        form.append("chat_id", String(target.chatId));
+        if (target.messageThreadId !== undefined) {
+          form.append("message_thread_id", String(target.messageThreadId));
+        }
         if (typeof photoPath === "string") {
           const fileBuffer = await fs.readFile(photoPath);
           const filename = path.basename(photoPath);
@@ -295,11 +357,15 @@ export class TelegramClient {
     throw new Error("Telegram sendPhoto failed: max retries reached");
   }
   public async sendDocumentFile(chatId: ChatId, filePath: string, caption?: string, replyMarkup?: ReplyMarkup, _signal?: AbortSignal, maxRetries = 3): Promise<unknown> {
+    const target = parseChatTarget(chatId);
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       try {
         const fileBuffer = await fs.readFile(filePath);
         const form = new FormData();
-        form.append("chat_id", String(chatId));
+        form.append("chat_id", String(target.chatId));
+        if (target.messageThreadId !== undefined) {
+          form.append("message_thread_id", String(target.messageThreadId));
+        }
         form.append("document", new Blob([fileBuffer]), path.basename(filePath));
         if (caption) {
           form.append("caption", caption.slice(0, 1024));

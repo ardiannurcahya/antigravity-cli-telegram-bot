@@ -14,6 +14,8 @@ import { addUsage } from "../domain/usage-math.js";
 import { reply, replyWithFormattedResponse, replyWithHtml } from "../ui/reply.js";
 import { usageText } from "../ui/messages.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
+import { generateShortTopicName } from "../domain/topic-namer.js";
+import { parseChatTarget } from "../telegram/client.js";
 import type { StreamEvent } from "../types.js";
 
 type PtyReportKind = "usage" | "credits" | "context";
@@ -227,11 +229,26 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const convTitle = latestSession?.conversationTitle || initialTitle;
     const stepCount = (latestSession?.conversationStepCount || 0) + (result.numTurns || 1);
 
+    let topicRenamed = latestSession?.topicRenamed || false;
+    const target = parseChatTarget(job.chatId);
+    if (target.messageThreadId && !topicRenamed) {
+      const shortTopicName = generateShortTopicName(job.prompt || "", result.text);
+      if (shortTopicName) {
+        try {
+          const ok = await context.telegram.editForumTopic(target.chatId, target.messageThreadId, shortTopicName);
+          if (ok) topicRenamed = true;
+        } catch (err) {
+          console.warn("[prompt-job] Failed to rename forum topic %s: %s", String(target.messageThreadId), (err as Error).message);
+        }
+      }
+    }
+
     await context.state.setSession(job.chatId, {
       ...(result.conversationId ? { conversationId: result.conversationId } : {}),
       conversationTitle: convTitle,
       conversationStepCount: stepCount,
       conversationLastModifiedAt: Date.now(),
+      topicRenamed,
       settings: latestSession?.settings || settings,
       lastRun,
       usageTotals: addUsage(latestSession?.usageTotals, result.usage),

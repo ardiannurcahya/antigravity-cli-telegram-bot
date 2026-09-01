@@ -7,6 +7,8 @@ export interface TelegramPhotoSize { file_id: string; file_unique_id: string; wi
 export interface TelegramDocument { file_id: string; file_name?: string; mime_type?: string; file_size?: number }
 export interface TelegramMessage {
   message_id: number;
+  message_thread_id?: number;
+  is_topic_message?: boolean;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
@@ -67,6 +69,7 @@ export interface SessionState {
   conversationTitle?: string;
   conversationStepCount?: number;
   conversationLastModifiedAt?: number | string;
+  topicRenamed?: boolean;
   settings?: Partial<SessionSettings>;
   lastRun?: RunStats;
   usageTotals?: Usage | null;
