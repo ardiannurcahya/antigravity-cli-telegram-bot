@@ -30,6 +30,7 @@ test("supports configurable telegram verbose level", () => {
 });
 
 test("calculates max context limits and renders progress bar", () => {
+  assert.equal(getModelMaxContext("gemini-3.8-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("gemini-3.7-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("gemini-3.6-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("claude-sonnet-4-6"), 200_000);
@@ -66,6 +67,9 @@ claude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)
 test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without obsolete 3.5 models", () => {
   const ids = DEFAULT_MODELS.map((m) => m.id);
   assert.ok(!ids.some((id) => id.includes("gemini-3.5")), "gemini-3.5 models must not be in DEFAULT_MODELS");
+  assert.ok(ids.includes("gemini-3.8-flash-high"));
+  assert.ok(ids.includes("gemini-3.8-flash-medium"));
+  assert.ok(ids.includes("gemini-3.8-flash-low"));
   assert.ok(ids.includes("gemini-3.7-flash-high"));
   assert.ok(ids.includes("gemini-3.7-flash-medium"));
   assert.ok(ids.includes("gemini-3.7-flash-low"));
@@ -77,5 +81,5 @@ test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without o
   assert.ok(ids.includes("claude-sonnet-4-6"));
   assert.ok(ids.includes("claude-opus-4-6-thinking"));
   assert.ok(ids.includes("gpt-oss-120b-medium"));
-  assert.equal(ids.length, 11);
+  assert.equal(ids.length, 14);
 });
