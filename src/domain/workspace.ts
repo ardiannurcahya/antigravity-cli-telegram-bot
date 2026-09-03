@@ -23,8 +23,8 @@ export interface AvailableWorkspace {
 }
 
 /**
- * Scanne les répertoires disponibles sous defaultWorkspace et projectsRoot
- * pour alimenter la sélection interactive du workspace via Telegram.
+ * Scans available directories under defaultWorkspace and projectsRoot
+ * to populate interactive Telegram workspace selection.
  */
 export function listAvailableWorkspaces(
   projectsRoot: string,
@@ -41,7 +41,7 @@ export function listAvailableWorkspaces(
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const name = entry.name;
-        // Ignore les dossiers cachés, node_modules, tmp, dist, etc.
+        // Ignore hidden folders, node_modules, tmp, dist, etc.
         if (name.startsWith(".") || name === "node_modules" || name === "tmp" || name === "dist") {
           continue;
         }
@@ -62,26 +62,26 @@ export function listAvailableWorkspaces(
         }
       }
     } catch {
-      // Ignore les erreurs de lecture de répertoire pour la résilience
+      // Ignore directory read errors for resilience
     }
   };
 
-  // 1. Scanner les sous-dossiers du workspace par défaut (ex: /home/med/projets/*)
+  // 1. Scan subdirectories of default workspace (e.g. /home/user/projects/*)
   scanDir(defaultWorkspace, true);
-  // 2. Scanner les sous-dossiers de la racine des projets si distincte (ex: /home/med/*)
+  // 2. Scan subdirectories of projects root if distinct (e.g. /home/user/*)
   if (projectsRoot !== defaultWorkspace) {
     scanDir(projectsRoot, false);
   }
 
-  // Trier par ordre alphabétique
+  // Sort alphabetically by name
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Valide et résout en toute sécurité un chemin saisi par l'utilisateur.
- * Prend en charge les chemins absolus directs, les chemins avec slash initial (/projets/scripts ou /scripts)
- * ainsi que les noms relatifs directs (scripts).
- * Vérifie rigoureusement le confinement dans projectsRoot ou defaultWorkspace.
+ * Safely validates and resolves a user-provided workspace path.
+ * Supports direct absolute paths, paths with leading slashes (/projects/scripts or /scripts),
+ * and direct relative project names (scripts).
+ * Strictly enforces boundary containment within projectsRoot or defaultWorkspace.
  */
 export function resolveWorkspacePath(
   input: string,
@@ -93,36 +93,36 @@ export function resolveWorkspacePath(
     return { valid: false, error: "Please specify a project name or directory path." };
   }
 
-  // Liste ordonnée de candidats à tester
+  // Ordered candidate list to test
   const candidates: string[] = [];
 
-  // 1. Si le chemin est absolu et existe directement sur le système de fichiers (ex: /home/med/projets/scripts)
+  // 1. If path is absolute and exists directly on disk (e.g. /home/user/projects/scripts)
   if (path.isAbsolute(trimmed) && fs.existsSync(trimmed)) {
     candidates.push(path.resolve(trimmed));
   }
 
-  // 2. Si le chemin commence par '/', tester sans les slashs initiaux
-  // Ex: "/projets/scripts" ou "/scripts"
+  // 2. If path starts with '/', test without leading slashes
+  // E.g. "/projects/scripts" or "/scripts"
   const strippedLeading = trimmed.replace(/^\/+/, "");
   if (strippedLeading) {
-    // Relativement au workspace par défaut (ex: /home/med/projets + scripts)
+    // Relative to default workspace (e.g. /home/user/projects + scripts)
     candidates.push(path.resolve(defaultWorkspace, strippedLeading));
-    // Relativement à projectsRoot (ex: /home/med + projets/scripts)
+    // Relative to projectsRoot (e.g. /home/user + projects/scripts)
     candidates.push(path.resolve(projectsRoot, strippedLeading));
   }
 
-  // 3. Tester relativement au workspace par défaut (ex: "scripts" dans /home/med/projets)
+  // 3. Test relative to default workspace (e.g. "scripts" in /home/user/projects)
   candidates.push(path.resolve(defaultWorkspace, trimmed));
 
-  // 4. Tester relativement à projectsRoot (ex: "projets/scripts" dans /home/med)
+  // 4. Test relative to projectsRoot (e.g. "projects/scripts" in /home/user)
   candidates.push(path.resolve(projectsRoot, trimmed));
 
-  // 5. Fallback sur le chemin absolu s'il avait été fourni ainsi
+  // 5. Fallback to absolute path if provided as such
   if (path.isAbsolute(trimmed)) {
     candidates.push(path.resolve(trimmed));
   }
 
-  // Sélection du premier candidat existant sur le disque
+  // Select first existing candidate on disk
   let chosenCandidate: string | null = null;
   for (const c of candidates) {
     if (fs.existsSync(c)) {
@@ -131,7 +131,7 @@ export function resolveWorkspacePath(
     }
   }
 
-  // Si aucun n'existe, on conserve le candidat le plus logique pour le message d'erreur
+  // If none exists, keep the most logical candidate for error reporting
   const candidate = chosenCandidate || (path.isAbsolute(trimmed) ? path.resolve(trimmed) : path.resolve(projectsRoot, trimmed));
 
   if (!fs.existsSync(candidate)) {
@@ -160,7 +160,7 @@ export function resolveWorkspacePath(
     return { valid: false, error: `Path resolution failure: ${(err as Error).message}` };
   }
 
-  // Le chemin résolu doit impérativement se situer dans realProjectsRoot OU realDefaultWorkspace
+  // Resolved path must strictly reside within realProjectsRoot OR realDefaultWorkspace
   const inProjects = isWithin(realCandidate, realProjectsRoot);
   const inDefault = isWithin(realCandidate, realDefaultWorkspace);
 

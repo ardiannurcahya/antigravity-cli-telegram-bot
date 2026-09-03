@@ -27,8 +27,8 @@ export class StateStore {
   public async resetSession(chatId: ChatId, preserveSettings = true, preserveWorkspace?: boolean): Promise<void> {
     const existing = this.data.sessions[String(chatId)];
     const isTopic = String(chatId).includes(":");
-    // En chat 1:1, preserveWorkspace vaut false par défaut (réinitialisation vers le workspace par défaut).
-    // En forum topic, preserveWorkspace vaut true par défaut (maintien du projet rattaché au topic).
+    // In 1:1 DMs, preserveWorkspace defaults to false (revert to default workspace).
+    // In forum topics, preserveWorkspace defaults to true (preserve workspace bound to topic).
     const keepWorkspace = preserveWorkspace !== undefined ? preserveWorkspace : isTopic;
     if (preserveSettings && existing?.settings) {
       const { continueSession, newProject, model, effort, ...restSettings } = existing.settings;

@@ -122,19 +122,19 @@ test("resetSession lifecycle: clears workspace in 1:1 DMs (Option A) and preserv
       },
     });
 
-    // Simulate /new in 1:1 DM par défaut (resetSession sans argument explicite pour preserveWorkspace)
+    // Simulate /new in 1:1 DM by default (resetSession without explicit preserveWorkspace argument)
     await store.resetSession(dmChatId);
     const dmSession = store.session(dmChatId);
     assert.equal(dmSession?.settings?.mode, "plan", "Mode should be preserved in DM");
     assert.equal(dmSession?.settings?.workspace, null, "Workspace should be reset to null in DM by default");
 
-    // Simulate /new in Forum Topic par défaut (resetSession sans argument explicite pour preserveWorkspace)
+    // Simulate /new in Forum Topic by default (resetSession without explicit preserveWorkspace argument)
     await store.resetSession(topicChatId);
     const topicSession = store.session(topicChatId);
     assert.equal(topicSession?.settings?.mode, "plan", "Mode should be preserved in Topic");
     assert.equal(topicSession?.settings?.workspace, "/home/user/projects/topic-repo", "Workspace should be preserved in Topic by default");
 
-    // Vérifier également qu'un appel explicite preserveWorkspace = true est honoré en DM
+    // Verify explicit preserveWorkspace = true is honored in DM
     await store.setSession(dmChatId, { settings: { model: "gemini-2.5-pro", workspace: "/home/user/projects/dm-forced" } });
     await store.resetSession(dmChatId, true, true);
     assert.equal(store.session(dmChatId)?.settings?.workspace, "/home/user/projects/dm-forced");
@@ -475,7 +475,7 @@ test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM a
       telegram: mockTelegram,
     } as unknown as AppContext;
 
-    // 1. En chat privé (1:1 DM), le bouton "✨ New" réinitialise le workspace à null
+    // 1. In private 1:1 DM, "✨ New" button resets workspace to null
     const dmChatId = 1111;
     await store.setSession(dmChatId, {
       settings: {
@@ -495,9 +495,9 @@ test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM a
         text: "✨ New",
       },
     });
-    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "Le bouton ✨ New doit réinitialiser le workspace en DM");
+    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "✨ New button should reset workspace in DM");
 
-    // 2. En chat privé (1:1 DM), la commande /new réinitialise le workspace à null
+    // 2. In private 1:1 DM, /new command resets workspace to null
     await store.setSession(dmChatId, {
       settings: {
         model: "gemini-2.5-flash",
@@ -512,9 +512,9 @@ test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM a
       text: "/new",
     };
     await handleCommand(mockContext, dmMsg, "/new", []);
-    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "La commande /new doit réinitialiser le workspace en DM");
+    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "/new command should reset workspace in DM");
 
-    // 3. En Forum Topic, le bouton "✨ New" conserve le workspace
+    // 3. In Forum Topic, "✨ New" button preserves workspace
     const topicChatId = 2222;
     const threadId = 55;
     const topicSessionKey = `${topicChatId}:${threadId}`;
@@ -535,9 +535,9 @@ test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM a
         text: "✨ New",
       },
     });
-    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "Le bouton ✨ New doit préserver le workspace en Forum Topic");
+    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "✨ New button should preserve workspace in Forum Topic");
 
-    // 4. En Forum Topic, la commande /new conserve le workspace
+    // 4. In Forum Topic, /new command preserves workspace
     const topicMsg: TelegramMessage = {
       message_id: 21,
       message_thread_id: threadId,
@@ -547,7 +547,7 @@ test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM a
       text: "/new",
     };
     await handleCommand(mockContext, topicMsg, "/new", []);
-    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "La commande /new doit préserver le workspace en Forum Topic");
+    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "/new command should preserve workspace in Forum Topic");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
