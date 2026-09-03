@@ -10,8 +10,9 @@ export function settingsText(settings: SessionSettings): string {
     `Model: ${modelLabel(settings.model)}`, `Effort: ${settings.effort}`, `Mode: ${settings.mode}`,
     `Verbose: ${settings.verbose || "detailed"}`, `Agent: ${settings.agent || "default"}`, `Project: ${settings.project || "default"}`,
     `Sandbox: ${settings.sandbox ? "enabled" : "disabled"}`, `Output: ${settings.outputFormat}`,
+    settings.workspace ? `Workspace: ${settings.workspace}` : null,
     `Add dirs: ${settings.addDirs?.length || 0}`, `Slash commands: ${settings.disableSlashCommands ? "disabled" : "enabled"}`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
@@ -28,6 +29,7 @@ export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
     `• <b>Verbose:</b> <code>${escapeHtml(settings.verbose || "detailed")}</code>`,
     `• <b>Context Limit:</b> <code>${escapeHtml(contextStr)}</code>`,
     `• <b>Sandbox:</b> <code>${settings.sandbox ? "Enabled" : "Disabled"}</code>`,
+    settings.workspace ? `• <b>Workspace:</b> <code>${escapeHtml(settings.workspace)}</code>` : null,
     context.config.agy.project ? `• <b>Project:</b> <code>${escapeHtml(context.config.agy.project)}</code>` : null,
   ].filter(Boolean).join("\n");
 }
@@ -66,7 +68,8 @@ export function sessionText(context: AppContext, chatId: ChatId): string {
     const relative = formatRelativeTime(session.conversationLastModifiedAt || session.updatedAt);
     lines.push(`Steps: ${session.conversationStepCount} · Last active: ${relative}`);
   }
-  lines.push(`Workspace: ${context.config.agy.workspace}`);
+  const customWs = settingsFor(context, chatId).workspace;
+  lines.push(`Workspace: ${customWs || context.config.agy.workspace}${customWs ? " (custom)" : " (default)"}`);
   lines.push(settingsText(settingsFor(context, chatId)));
   lines.push(`Status: ${status.active ? "running" : "idle"}`);
   return lines.join("\n");

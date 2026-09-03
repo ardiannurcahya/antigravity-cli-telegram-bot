@@ -5,7 +5,7 @@ import type { AppContext } from "../context.js";
 import { controllerKey } from "../context.js";
 import { parseCommandArgs } from "../agy-runner.js";
 import { createMainKeyboard } from "../keyboards.js";
-import { settingsFor } from "../domain/settings.js";
+import { effectiveWorkspaceFor, settingsFor } from "../domain/settings.js";
 import { sessionInfoHtml } from "../ui/messages.js";
 import { modelKeyboard } from "../ui/inline-keyboards.js";
 import { reply, replyWithHtml } from "../ui/reply.js";
@@ -128,24 +128,24 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
           } else if (isAnimation) {
             const dest = path.join(destDir, `anim_${Date.now()}_${fileId.slice(-8)}${fileExt}`);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
-          } else if (isAudio) {
+          }
+          const effectiveWorkspace = effectiveWorkspaceFor(context, sessionKey);
+          const uploadsDir = path.join(effectiveWorkspace, "uploads");
+          if (isAudio) {
             const rawName = message.audio?.file_name || `audio_${Date.now()}_${fileId.slice(-8)}${fileExt}`;
             const cleanName = path.basename(rawName).replace(/[^a-zA-Z0-9._-]/g, "_");
-            const uploadsDir = path.join(context.config.agy.workspace, "uploads");
             const dest = path.join(uploadsDir, cleanName);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
             documentName = cleanName;
           } else if (isVideo) {
             const rawName = message.video?.file_name || `video_${Date.now()}_${fileId.slice(-8)}${fileExt}`;
             const cleanName = path.basename(rawName).replace(/[^a-zA-Z0-9._-]/g, "_");
-            const uploadsDir = path.join(context.config.agy.workspace, "uploads");
             const dest = path.join(uploadsDir, cleanName);
             mediaPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
             documentName = cleanName;
           } else if (isDoc && message.document) {
             const rawName = message.document.file_name || `doc_${Date.now()}.bin`;
             const cleanName = path.basename(rawName).replace(/[^a-zA-Z0-9._-]/g, "_");
-            const uploadsDir = path.join(context.config.agy.workspace, "uploads");
             const dest = path.join(uploadsDir, cleanName);
             documentPath = await context.telegram.downloadFile(fileInfo.file_path, dest);
             documentName = cleanName;

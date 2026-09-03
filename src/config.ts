@@ -26,6 +26,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const allowedModels = modelsFrom(env);
   const model = (env.AGY_MODEL || "").trim();
   if (model && !allowedModels.includes(model)) throw new Error(`AGY_MODEL is not in AGY_ALLOWED_MODELS: ${model}`);
+  const projectsRootRaw = env.AGY_PROJECTS_ROOT?.trim();
+  const projectsRoot = projectsRootRaw ? path.resolve(projectsRootRaw) : path.dirname(workspace);
   const dbPath = resolveEffectiveDbPath(env.AGY_DB_PATH);
   return {
     telegram: {
@@ -45,6 +47,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       agent: (env.AGY_AGENT || "").trim() || undefined,
       allowDangerouslySkipPermissions: booleanFrom(env, "AGY_ALLOW_DANGEROUSLY_SKIP_PERMISSIONS", false),
       dbPath,
+      projectsRoot,
     },
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),

@@ -24,10 +24,12 @@ export class StateStore {
   }
 
   public session(chatId: ChatId): SessionState | null { return this.data.sessions[String(chatId)] || null; }
-  public async resetSession(chatId: ChatId, preserveSettings = true): Promise<void> {
+  public async resetSession(chatId: ChatId, preserveSettings = true, preserveWorkspace = true): Promise<void> {
     const existing = this.data.sessions[String(chatId)];
-    if (preserveSettings && existing?.settings) {
       const { continueSession, newProject, model, effort, ...restSettings } = existing.settings;
+      if (!preserveWorkspace) {
+        restSettings.workspace = null;
+      }
       const hasCustomSettings = Object.values(restSettings).some((val) => val !== undefined && val !== null);
       if (hasCustomSettings) {
         this.data.sessions[String(chatId)] = {

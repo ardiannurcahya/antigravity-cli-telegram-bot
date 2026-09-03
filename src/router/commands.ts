@@ -22,6 +22,8 @@ import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
+import { resolveWorkspacePath } from "../domain/workspace.js";
+import { escapeHtml } from "../telegram.js";
 import type { ChatId, TelegramMessage } from "../types.js";
 
 interface CommandInput {
@@ -55,9 +57,10 @@ command("/help")(async ({ context, chatId }) => {
   await cliOutput(context, chatId, loading.message_id, "help");
 });
 
-command("/new")(async ({ context, chatId }) => {
+command("/new")(async ({ context, chatId, message }) => {
   await cleanupSessionTempFiles(context.config.tempDir, chatId);
-  await context.state.resetSession(chatId);
+  const isTopic = Boolean(message?.message_thread_id);
+  await context.state.resetSession(chatId, true, isTopic);
   await replyWithHtml(context, chatId, sessionInfoHtml(context, chatId), createMainKeyboard(settingsFor(context, chatId)));
 });
 
@@ -278,6 +281,60 @@ command("/continue")(async ({ context, chatId, args }) => {
     return;
   }
   await reply(context, chatId, `Use /continue to browse sessions, or /continue on|off to toggle continuation flag.`, createMainKeyboard(settingsFor(context, chatId)));
+});
+
+command("/workspace")(async ({ context, chatId, args }) => {
+  const currentSettings = settingsFor(context, chatId);
+  if (!args[0]) {
+    const activeWs = currentSettings.workspace || context.config.agy.workspace;
+    const isCustom = Boolean(currentSettings.workspace);
+    const text = [
+      `📁 <b>Active Workspace:</b> <code>${escapeHtml(activeWs)}</code> ${isCustom ? "(custom)" : "(default)"}`,
+      `⚙️ <b>Default Root:</b> <code>${escapeHtml(context.config.agy.workspace)}</code>`,
+      `📂 <b>Projects Root:</b> <code>${escapeHtml(context.config.agy.projectsRoot)}</code>\n`,
+      "<b>Usage:</b>",
+      "• <code>/workspace &lt;name|path&gt;</code> - Switch active workspace to a project directory",
+      "• <code>/workspace clear</code> - Revert back to default workspace",
+    ].join("\n");
+    await replyWithHtml(context, chatId, text, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  const sub = args[0].toLowerCase().trim();
+  if (sub === "clear" || sub === "reset" || sub === "default") {
+    currentSettings.workspace = null;
+    await saveSettings(context, chatId, currentSettings);
+    await context.state.resetSession(chatId);
+    await replyWithHtml(
+      context,
+      chatId,
+      `🔄 <b>Workspace reset to default:</b> <code>${escapeHtml(context.config.agy.workspace)}</code>\n\nA new clean session has been started.`,
+      createMainKeyboard(settingsFor(context, chatId))
+    );
+    return;
+  }
+
+  const targetInput = args.join(" ").trim();
+  const resolution = resolveWorkspacePath(targetInput, context.config.agy.projectsRoot, context.config.agy.workspace);
+  if (!resolution.valid || !resolution.resolvedPath) {
+    await replyWithHtml(
+      context,
+      chatId,
+      `⚠️ <b>Workspace error</b>\n\n${resolution.error || "Invalid path."}`,
+      createMainKeyboard(currentSettings)
+    );
+    return;
+  }
+
+  currentSettings.workspace = resolution.resolvedPath;
+  await saveSettings(context, chatId, currentSettings);
+  await context.state.resetSession(chatId);
+  await replyWithHtml(
+    context,
+    chatId,
+    `📁 <b>Workspace switched</b>\n\nActive project: <code>${escapeHtml(resolution.resolvedPath)}</code>\n\nA new clean session has been started in this workspace.`,
+    createMainKeyboard(settingsFor(context, chatId))
+  );
 });
 
 command("/new-project", "/disable-slash-commands")(async ({ context, chatId, command, args }) => {

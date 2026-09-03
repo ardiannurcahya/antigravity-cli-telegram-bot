@@ -193,6 +193,11 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       updateProgress(null);
     }, 2500);
 
+    const effectiveWorkspace = settings.workspace || context.config.agy.workspace;
+    const effectiveAgyConfig = effectiveWorkspace === context.config.agy.workspace
+      ? context.config.agy
+      : { ...context.config.agy, workspace: effectiveWorkspace };
+
     let result;
     try {
       await context.state.setInFlight(job.chatId, {
@@ -205,7 +210,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         mediaType: job.mediaType,
         startedAt: Date.now(),
       });
-      result = await runAgy(context.config.agy, job.prompt || "", session?.conversationId || null, {
+      result = await runAgy(effectiveAgyConfig, job.prompt || "", session?.conversationId || null, {
         ...settings,
         signal: controller.signal,
         imagePath: job.imagePath,
@@ -266,7 +271,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         step_count: stepCount,
         last_modified_time: Date.now(),
         project_id: settings.project || "default-cli-project",
-        workspace_uris: `["file://${context.config.agy.workspace}"]`,
+        workspace_uris: `["file://${effectiveWorkspace}"]`,
       });
     }
 
@@ -293,7 +298,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       }
     }
     await detectAndSendGeneratedImages(context, job.chatId, result, effectiveConvId, startedAt);
-    const mediaFiles = await findReferencedMediaFiles(result.text, context.config.agy.workspace);
+    const mediaFiles = await findReferencedMediaFiles(result.text, effectiveWorkspace);
     for (const mediaPath of mediaFiles) {
       const ext = path.extname(mediaPath).toLowerCase();
       const isPhoto = [".png", ".jpg", ".jpeg", ".webp"].includes(ext);

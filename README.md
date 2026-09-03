@@ -68,11 +68,12 @@ service under a dedicated Unix user.
 - Per-turn and accumulated token usage when AGY provides usage data.
 - Long replies uploaded as Markdown documents.
 - Process-group timeout and hard cancellation.
-- Strict TypeScript build with an automated test suite (120 passing tests).
+- Strict TypeScript build with an automated test suite (139 passing tests).
 - Clean modular architecture (`domain`, `infra`, `router`, `telegram`, `ui`, `usecases`).
-- Hardened security: Bitwise 128-bit IPv6 SSRF protection, strict path containment, secret scrubbing, and safe permission defaults.
+- Hardened security: Bitwise 128-bit IPv6 SSRF protection, strict path containment (`isWithin`), secret scrubbing, and safe permission defaults.
 - Dangerous plugin, update, install, and permission operations require an explicit second confirmation.
-- AGY is restricted to the configured workspace.
+- Per-session workspace isolation: scope AGY's working directory dynamically with `/workspace <name|path>`, automatically reverting to global root on `/new` in 1:1 DMs (Option A) and preserving topic binding in forum supergroups.
+- AGY is restricted to the configured workspace by default.
 
 ## Architecture
 
@@ -267,6 +268,7 @@ system prefix.
 | `/continue on\|off` | Toggle `--continue` for future prompts. |
 | `/new-project on\|off` | Toggle `--new-project` for future prompts. |
 | `/disable-slash-commands on\|off` | Toggle `--disable-slash-commands` for future prompts. |
+| `/workspace [NAME\|PATH\|clear]` | Show active workspace, switch to a project directory, or reset to default. |
 
 Any other text is treated as an AGY prompt. `/agy` accepts the complete
 non-interactive flag surface shown by `agy --help`, including repeatable
@@ -274,7 +276,25 @@ non-interactive flag surface shown by `agy --help`, including repeatable
 `--effort`, `--json-schema`, `--log-file`, `--new-project`, `--output-format`,
 `--print-timeout`, `--project`, `--sandbox`, and the `--print`/`--prompt`
 aliases. Arguments are passed directly to AGY and never through a shell.
-The process working directory remains fixed by `AGY_WORKSPACE`.
+By default, the process working directory is fixed by `AGY_WORKSPACE`, and can be
+dynamically scoped per session or forum topic using `/workspace`.
+
+### Workspace Scoping & Lifecycle (/workspace)
+
+By default, the process working directory is fixed by `AGY_WORKSPACE` to preserve a friction-free experience for general daily assistant tasks (smart home, notes, calendar, email drafts).
+
+For software development workflows, `/workspace` enables scoping the working directory to a specific project repository:
+
+```bash
+/workspace                 # Display the current workspace and allowed projects root
+/workspace my-project      # Switch the active workspace to /path/to/projects/my-project
+/workspace clear           # Revert back to the default AGY_WORKSPACE
+```
+
+#### Lifecycle and Mental Model (Option A)
+- **1:1 Direct Messages (Ephemeral)**: Starting a new conversation with `/new` automatically resets the session **and** reverts the workspace back to `AGY_WORKSPACE`. This ensures ad-hoc debugging or coding sessions never accidentally linger or trap subsequent personal assistant tasks in a code repository.
+- **Forum Topics (Persistent Binding)**: In Telegram supergroups with forum topics, running `/new` within a dedicated topic clears the conversation history but **preserves the topic's project workspace binding**. This allows project-specific threads (e.g. `#my-app`) to stay anchored to their repository.
+- **Security & Confinement**: Directory selection is strictly validated using path containment checks (`isWithin`) against `AGY_PROJECTS_ROOT` and the default workspace to prevent path traversal attacks (`../`).
 
 The full control panel is available from `/menu`. The persistent keyboard next
 to the input intentionally contains only `Model` and the current `Mode` button;
@@ -331,7 +351,8 @@ following variables are supported:
 | `TELEGRAM_PRIVATE_ONLY` | `1` | Reject non-private chats unless set to `0`. |
 | `TELEGRAM_MAX_MESSAGE_CHARS` | `3900` | Telegram message chunk size. |
 | `AGY_BIN` | `/root/.local/bin/agy` | Absolute path to the AGY executable. |
-| `AGY_WORKSPACE` | `/srv/agy-workspaces/default` | Only working directory AGY may use. Must be absolute. |
+| `AGY_WORKSPACE` | `/srv/agy-workspaces/default` | Default working directory AGY may use. Must be absolute. |
+| `AGY_PROJECTS_ROOT` | Parent of `AGY_WORKSPACE` | Base directory for discovering and scoping projects with `/workspace`. |
 | `AGY_PROJECT` | Empty | Optional AGY project identifier. |
 | `AGY_DB_PATH` | `~/.gemini/antigravity-cli/conversation_summaries.db` | Read-only AGY SQLite database used by `/resume`. |
 | `AGY_MODE` | `plan` | AGY mode: `plan` or `accept-edits`. |

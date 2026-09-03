@@ -16,6 +16,7 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     agent: config.agy.agent || null, project: config.agy.project || null, addDirs: [], continueSession: false,
     newProject: false, disableSlashCommands: false, jsonSchema: null, logFile: null, outputFormat: "stream-json",
     printTimeout: null, verbose: config.telegram.verbose || "detailed",
+    workspace: null,
   };
   const stored = context.state.session(chatId)?.settings || {};
   const settings: SessionSettings = {
@@ -34,9 +35,15 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     outputFormat: stored.outputFormat === "text" || stored.outputFormat === "json" || stored.outputFormat === "stream-json" ? stored.outputFormat : defaults.outputFormat,
     printTimeout: typeof stored.printTimeout === "string" && stored.printTimeout.trim() ? stored.printTimeout.trim() : null,
     verbose: typeof stored.verbose === "string" && isVerbose(stored.verbose) ? stored.verbose : defaults.verbose,
+    workspace: typeof stored.workspace === "string" && stored.workspace.trim() ? stored.workspace.trim() : defaults.workspace,
   };
   if (config.agy.sandbox && !config.agy.allowSandboxDisable) settings.sandbox = true;
   return settings;
+}
+
+export function effectiveWorkspaceFor(context: AppContext, chatId: ChatId): string {
+  const custom = settingsFor(context, chatId).workspace;
+  return custom || context.config.agy.workspace;
 }
 
 export async function saveSettings(context: AppContext, chatId: ChatId, settings: SessionSettings): Promise<void> {

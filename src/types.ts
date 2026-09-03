@@ -60,6 +60,7 @@ export interface SessionSettings {
   outputFormat?: "text" | "json" | "stream-json";
   printTimeout?: string | null;
   verbose?: "silent" | "compact" | "detailed";
+  workspace?: string | null;
 }
 
 export interface Usage {
@@ -131,6 +132,7 @@ export interface AgyConfig {
   agent?: string;
   allowDangerouslySkipPermissions: boolean;
   dbPath: string;
+  projectsRoot: string;
 }
 
 export interface AppConfig {
