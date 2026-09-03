@@ -4,6 +4,7 @@ import { isEffort, isMode, isVerbose } from "../config.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor, saveSettings, type SettingsOutputFormat } from "../domain/settings.js";
+import { resolveWorkspacePath } from "../domain/workspace.js";
 import {
   backKeyboard,
   button,
@@ -163,6 +164,45 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
   if (key === "sandbox" && ["on", "off"].includes(value) && (value === "on" || context.config.agy.allowSandboxDisable || !context.config.agy.sandbox)) settings.sandbox = value === "on";
   if (key === "output" && isOutputFormat(value)) settings.outputFormat = value;
   if (key === "verbose" && isVerbose(value)) settings.verbose = value;
+  if (key === "ws" || key === "workspace") {
+    if (value === "clear" || value === "default" || value === "reset") {
+      settings.workspace = null;
+      await saveSettings(context, chatId, settings);
+      await context.state.resetSession(chatId);
+      await context.telegram.editMessageText(
+        chatId,
+        messageId,
+        `🔄 <b>Workspace reset to default:</b> <code>${escapeHtml(context.config.agy.workspace)}</code>\n\nA new clean session has been started.`,
+        { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
+        "HTML"
+      );
+      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
+      return;
+    }
+    const resolution = resolveWorkspacePath(value, context.config.agy.projectsRoot, context.config.agy.workspace);
+    if (!resolution.valid || !resolution.resolvedPath) {
+      await context.telegram.editMessageText(
+        chatId,
+        messageId,
+        `⚠️ <b>Workspace error</b>\n\n${resolution.error || "Invalid path."}`,
+        { inline_keyboard: [[button("‹ Back", "menu:workspace")]] },
+        "HTML"
+      );
+      return;
+    }
+    settings.workspace = resolution.resolvedPath;
+    await saveSettings(context, chatId, settings);
+    await context.state.resetSession(chatId);
+    await context.telegram.editMessageText(
+      chatId,
+      messageId,
+      `📁 <b>Workspace switched</b>\n\nActive project: <code>${escapeHtml(resolution.resolvedPath)}</code>\n\nA new clean session has been started in this workspace.`,
+      { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
+      "HTML"
+    );
+    await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
+    return;
+  }
   await saveSettings(context, chatId, settings);
   if (key === "output") await context.telegram.editMessageText(chatId, messageId, "Output format updated.", cliOptionsKeyboard(context, chatId));
   else if (key === "verbose") await context.telegram.editMessageText(chatId, messageId, `Verbose level set to ${value}.`, verboseKeyboard(context, chatId));

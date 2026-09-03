@@ -12,6 +12,7 @@ import {
   outputFormatKeyboard,
   sandboxKeyboard,
   verboseKeyboard,
+  workspaceKeyboard,
 } from "../ui/inline-keyboards.js";
 import { sessionInfoHtml, sessionOptionUsage, sessionText, usageReport } from "../ui/messages.js";
 import { cliOutput, showMain, showResumeMenu } from "../ui/screens.js";
@@ -296,7 +297,7 @@ command("/workspace")(async ({ context, chatId, args }) => {
       "• <code>/workspace &lt;name|path&gt;</code> - Switch active workspace to a project directory",
       "• <code>/workspace clear</code> - Revert back to default workspace",
     ].join("\n");
-    await replyWithHtml(context, chatId, text, createMainKeyboard(currentSettings));
+    await replyWithHtml(context, chatId, text, workspaceKeyboard(context, chatId, 0));
     return;
   }
 

@@ -108,8 +108,11 @@ export function resolveWorkspacePath(
    - Tout chemin contenant des séquences non résolues sortant de la racine autorisée est rejeté avec un message d'erreur clair.
 2. **Existence du répertoire** :
    - Le chemin ciblé doit exister sur le disque et être un répertoire (`fs.statSync().isDirectory()`).
+   - La résolution prend en charge les chemins absolus directs, les chemins avec slash initial (`/projets/scripts` ou `/scripts`) résolus par rapport à `AGY_PROJECTS_ROOT` et `AGY_WORKSPACE`, ainsi que les noms relatifs directs (`scripts`).
 3. **Réinitialisation de contexte propre** :
    - Changer de workspace via `/workspace <projet>` force une réinitialisation de conversation pour empêcher toute contamination du contexte du modèle avec l'historique d'un précédent projet.
+4. **Rappel visuel de contexte sur prompt** :
+   - Dès qu'un workspace personnalisé est assigné à la session active, le premier message émis lors du traitement d'un prompt (`progressMessage`) rappelle explicitement le workspace actif (`📁 Workspace: <chemin>`) afin de confirmer le répertoire de travail d'exécution.
 
 ---
 
@@ -117,11 +120,12 @@ export function resolveWorkspacePath(
 
 | Commande | Contexte | Comportement |
 | :--- | :--- | :--- |
-| `/workspace` | Tous | Affiche le workspace actif (personnalisé ou par défaut) et la racine autorisée. |
-| `/workspace <nom\|chemin>` | 1:1 ou Topic | Vérifie et assigne le workspace à la session active, réinitialise la session. |
+| `/workspace` | Tous | Propose l'autocomplétion native Telegram et affiche l'état actuel avec un clavier inline des projets disponibles. |
+| `/workspace <nom\|/chemin>` | 1:1 ou Topic | Résout de manière tolérante le chemin (avec ou sans `/`), valide le confinement, assigne à la session et réinitialise la session. |
 | `/workspace clear` | Tous | Rétablit immédiatement le workspace global `AGY_WORKSPACE`. |
 | `/new` | Chat 1:1 | Réinitialise la session **et** réinitialise le workspace au défaut global. |
 | `/new` | Forum Topic | Réinitialise la session **en conservant** le workspace attaché au topic. |
+| Prompt utilisateur | Session avec workspace personnalisé | Rappelle dans le message initial de progression (`progressMessage`) le workspace forcé. |
 
 ---
 
@@ -129,21 +133,24 @@ export function resolveWorkspacePath(
 
 | Identifiant | Scénario de test | Entrée | Résultat attendu |
 | :--- | :--- | :--- | :--- |
-| **TC-WS-01** | Consultation par défaut | `/workspace` sans argument | Affiche `AGY_WORKSPACE` comme workspace actif. |
+| **TC-WS-01** | Consultation par défaut | `/workspace` sans argument | Affiche `AGY_WORKSPACE` et les boutons inline des projets scannés. |
 | **TC-WS-02** | Changement valide par nom | `/workspace agy-telegram` | Résout `/home/med/projets/agy-telegram`, valide et met à jour la session. |
-| **TC-WS-03** | Tentative de path traversal | `/workspace ../../etc` | Rejet avec message d'erreur de sécurité. |
-| **TC-WS-04** | Dossier inexistant | `/workspace projet-inexistant` | Rejet indiquant que le répertoire n'existe pas. |
-| **TC-WS-05** | `/workspace clear` | `/workspace clear` | Restaure le workspace global par défaut. |
-| **TC-WS-06** | `/new` en chat 1:1 (Option A) | `/new` après `/workspace` en DM | Workspace réinitialisé vers `AGY_WORKSPACE`. |
-| **TC-WS-07** | `/new` en forum topic | `/new` après `/workspace` en Topic | Workspace du topic conservé. |
+| **TC-WS-03** | Chemin avec préfixe slash | `/workspace /projets/scripts` | Résout sous `projectsRoot` vers `/home/med/projets/scripts` avec succès. |
+| **TC-WS-04** | Sous-dossier avec slash | `/workspace /scripts` | Résout sous `defaultWorkspace` vers `/home/med/projets/scripts` avec succès. |
+| **TC-WS-05** | Tentative de path traversal | `/workspace ../../etc` ou `/workspace /etc` | Rejet avec message d'erreur de sécurité. |
+| **TC-WS-06** | Dossier inexistant | `/workspace projet-inexistant` | Rejet indiquant que le répertoire n'existe pas. |
+| **TC-WS-07** | `/workspace clear` | `/workspace clear` | Restaure le workspace global par défaut. |
+| **TC-WS-08** | `/new` en chat 1:1 (Option A) | `/new` après `/workspace` en DM | Workspace réinitialisé vers `AGY_WORKSPACE`. |
+| **TC-WS-09** | `/new` en forum topic | `/new` après `/workspace` en Topic | Workspace du topic conservé. |
+| **TC-WS-10** | Rappel de workspace au prompt | Prompt sur session personnalisée | Bannière de rappel du workspace forcé dans le message initial. |
 
 ---
 
 ## 7. Plan d'implémentation par étapes
 
-1. **Étape 1 : Domaine et utilitaires de sécurité (`src/domain/workspace.ts`)**
-2. **Étape 2 : Configuration et persistance de session (`src/config.ts`, `src/domain/settings.ts`)**
-3. **Étape 3 : Commandes Telegram et cycle de vie (`src/router/commands.ts`)**
-4. **Étape 4 : Injection du `cwd` dans le runner AGY (`src/usecases/prompt-job.ts`, `src/router/updates.ts`)**
-5. **Étape 5 : Documentation amont (`README.md`) et carnet de route (`BACKLOG.md`)**
-6. **Étape 6 : Tests unitaires, compilation et validation en conditions réelles**
+1. **Étape 1 : Domaine et utilitaires de sécurité (`src/domain/workspace.ts`)** (résolution avec `/`, scan des workspaces disponibles).
+2. **Étape 2 : Autocomplétion native Telegram (`src/bot.ts`)** (ajout de `workspace` dans `BOT_COMMANDS`).
+3. **Étape 3 : Clavier interactif de sélection (`src/ui/inline-keyboards.ts`, `src/router/callbacks.ts`, `src/ui/screens.ts`)**.
+4. **Étape 4 : Bannière de rappel de workspace au prompt (`src/usecases/prompt-job.ts`)**.
+5. **Étape 5 : Mise à jour de la documentation (`README.md`, `BACKLOG.md`)**.
+6. **Étape 6 : Tests unitaires automatisés et validation de non-régression (`test/workspace.test.ts`)**.

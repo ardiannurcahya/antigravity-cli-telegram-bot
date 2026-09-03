@@ -48,6 +48,7 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "sandbox", description: "Show or change sandbox mode" },
   { command: "verbose", description: "Show or change verbose level (detailed, compact, silent)" },
   { command: "session", description: "Show session settings" },
+  { command: "workspace", description: "Show or change active project workspace" },
   { command: "learn", description: "Learn reusable rules/skills from recent chat" },
   { command: "compact", description: "Compact context and create state snapshot to save tokens" },
   { command: "help", description: "Show available commands" },

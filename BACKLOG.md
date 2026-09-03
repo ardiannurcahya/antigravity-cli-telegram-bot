@@ -52,7 +52,7 @@ systemctl --user restart agy-telegram
 
 ## 3. Améliorations futures et pistes d'évolution
 
-- [~] **Isolation de workspace par session et topic (/workspace)** : Portée dynamique du répertoire de travail (`cwd`), avec réinitialisation éphémère en DM 1:1 sur `/new` (Option A) et persistance par forum topic, sécurisé par vérification de confinement (`isWithin`) ([Issue #26](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/26), [Spécifications](docs/specs/per-session-workspace-isolation.md)).
+- [x] **Isolation de workspace par session et topic (/workspace)** : Portée dynamique du répertoire de travail (`cwd`), autocomplétion native Telegram et sélection interactive par boutons inline, résolution flexible avec préfixe slash (`/`), rappel visuel du workspace forcé au prompt, réinitialisation éphémère en DM 1:1 sur `/new` (Option A) et persistance par forum topic, sécurisé par vérification de confinement (`isWithin`) ([Issue #26](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/26), [Spécifications](docs/specs/per-session-workspace-isolation.md)).
 - [ ] **Transcription vocale automatique (Speech-to-Text / STT)** : Transcription automatique des messages vocaux Telegram en prompts textuels directs via Gemini Speech ou Whisper ([Spécifications](docs/specs/speech-to-text-transcription.md)).
 - [ ] **Internationalisation (i18n)** : Possibilité de configurer la langue des messages système du bot (français / anglais).
 - [ ] **Gestion avancée des quotas** : Alertes Telegram paramétrables lorsque le quota approche d'un seuil critique (ex. 80 %).

@@ -1,6 +1,7 @@
 import type { AppContext } from "../context.js";
 import { getActiveModels } from "../models.js";
 import { settingsFor } from "../domain/settings.js";
+import { listAvailableWorkspaces } from "../domain/workspace.js";
 import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary } from "../types.js";
 
 export function button(text: string, callback_data: string): { text: string; callback_data: string } { return { text, callback_data }; }
@@ -63,21 +64,62 @@ export function verboseKeyboard(context: AppContext, chatId: ChatId): InlineKeyb
   return { inline_keyboard: [choices, [button("‹ Back", "menu:main")]] };
 }
 
+export function workspaceKeyboard(context: AppContext, chatId: ChatId, page = 0): InlineKeyboardMarkup {
+  const pageSize = 6;
+  const currentSettings = settingsFor(context, chatId);
+  const activeWs = currentSettings.workspace;
+  const workspaces = listAvailableWorkspaces(context.config.agy.projectsRoot, context.config.agy.workspace);
+  const totalPages = Math.max(1, Math.ceil(workspaces.length / pageSize));
+  const normalizedPage = Math.min(Math.max(page, 0), totalPages - 1);
+  const slice = workspaces.slice(normalizedPage * pageSize, normalizedPage * pageSize + pageSize);
+
+  const rows: InlineButton[][] = [];
+  for (let i = 0; i < slice.length; i += 2) {
+    const row: InlineButton[] = [];
+    const item1 = slice[i];
+    const isSelected1 = activeWs === item1.path;
+    row.push(button(`${isSelected1 ? "✅ " : "📁 "}${item1.name}`, `set:ws:${item1.name}`));
+    if (slice[i + 1]) {
+      const item2 = slice[i + 1];
+      const isSelected2 = activeWs === item2.path;
+      row.push(button(`${isSelected2 ? "✅ " : "📁 "}${item2.name}`, `set:ws:${item2.name}`));
+    }
+    rows.push(row);
+  }
+
+  if (totalPages > 1) {
+    const navigation: InlineButton[] = [];
+    if (normalizedPage > 0) navigation.push(button("‹", `menu:workspace:${normalizedPage - 1}`));
+    navigation.push(button(`${normalizedPage + 1}/${totalPages}`, "noop"));
+    if (normalizedPage < totalPages - 1) navigation.push(button("›", `menu:workspace:${normalizedPage + 1}`));
+    rows.push(navigation);
+  }
+
+  const actionsRow: InlineButton[] = [];
+  if (activeWs) {
+    actionsRow.push(button("🔄 Reset default", "set:ws:clear"));
+  }
+  actionsRow.push(button("‹ Back", "menu:main"));
+  rows.push(actionsRow);
+
+  return { inline_keyboard: rows };
+}
+
 export function mainInlineKeyboard(): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
       [button("Models", "menu:models"), button("Effort", "menu:effort")],
       [button("Mode", "menu:mode"), button("Sandbox", "menu:sandbox")],
-      [button("Verbose", "menu:verbose"), button("Resume session", "menu:resume")],
+      [button("Workspace", "menu:workspace"), button("Resume session", "menu:resume")],
+      [button("Verbose", "menu:verbose"), button("Session", "menu:session")],
       [button("Usage / Quota", "action:usage"), button("Active Context", "action:context")],
-      [button("Session", "menu:session"), button("CLI options", "menu:cli")],
-      [button("AGY models", "cli:models"), button("AGY agents", "cli:agents")],
-      [button("Changelog", "cli:changelog"), button("Plugins", "cli:plugins")],
-      [button("CLI help", "cli:help"), button("CLI version", "cli:version")],
-      [button("Custom /agy", "menu:custom"), button("Plugin actions", "menu:plugins")],
+      [button("CLI options", "menu:cli"), button("AGY models", "cli:models")],
+      [button("AGY agents", "cli:agents"), button("Plugins", "cli:plugins")],
+      [button("Changelog", "cli:changelog"), button("CLI help", "cli:help")],
+      [button("CLI version", "cli:version"), button("Custom /agy", "menu:custom")],
+      [button("Plugin actions", "menu:plugins"), button("Update CLI", "cli:update")],
       [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
-      [button("🔄 Update Bot", "action:update_bot"), button("Update CLI", "cli:update")],
-      [button("Cancel", "action:cancel")],
+      [button("🔄 Update Bot", "action:update_bot"), button("Cancel", "action:cancel")],
     ],
   };
 }

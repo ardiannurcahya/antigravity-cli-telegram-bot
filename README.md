@@ -286,15 +286,18 @@ By default, the process working directory is fixed by `AGY_WORKSPACE` to preserv
 For software development workflows, `/workspace` enables scoping the working directory to a specific project repository:
 
 ```bash
-/workspace                 # Display the current workspace and allowed projects root
+/workspace                 # Display the current workspace and interactive project buttons
 /workspace my-project      # Switch the active workspace to /path/to/projects/my-project
+/workspace /projets/repo   # Flexible resolution accepting leading slash prefix
 /workspace clear           # Revert back to the default AGY_WORKSPACE
 ```
 
 #### Lifecycle and Mental Model (Option A)
 - **1:1 Direct Messages (Ephemeral)**: Starting a new conversation with `/new` automatically resets the session **and** reverts the workspace back to `AGY_WORKSPACE`. This ensures ad-hoc debugging or coding sessions never accidentally linger or trap subsequent personal assistant tasks in a code repository.
 - **Forum Topics (Persistent Binding)**: In Telegram supergroups with forum topics, running `/new` within a dedicated topic clears the conversation history but **preserves the topic's project workspace binding**. This allows project-specific threads (e.g. `#my-app`) to stay anchored to their repository.
-- **Security & Confinement**: Directory selection is strictly validated using path containment checks (`isWithin`) against `AGY_PROJECTS_ROOT` and the default workspace to prevent path traversal attacks (`../`).
+- **Visual Feedback on Prompt**: When a custom workspace is bound to a session, every prompt immediately displays a clear workspace confirmation banner in the live progress message (`📁 Workspace: /path/to/project`).
+- **Interactive Keyboard & Autocompletion**: `/workspace` is registered for Telegram slash-command autocompletion and displays an interactive inline button menu when called without arguments, allowing one-tap project switching without typing.
+- **Security & Confinement**: Directory selection is strictly validated using path containment checks (`isWithin`) against `AGY_PROJECTS_ROOT` and the default workspace to prevent path traversal attacks (`../`). Leading slashes (e.g. `/scripts` or `/projets/scripts`) are cleanly resolved relative to authorized roots.
 
 The full control panel is available from `/menu`. The persistent keyboard next
 to the input intentionally contains only `Model` and the current `Mode` button;

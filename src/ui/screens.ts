@@ -13,6 +13,7 @@ import {
   resumeKeyboard,
   sandboxKeyboard,
   verboseKeyboard,
+  workspaceKeyboard,
 } from "./inline-keyboards.js";
 import { resumeMessageText, sessionText, settingsText } from "./messages.js";
 import { reply, replyWithHtml } from "./reply.js";
@@ -103,6 +104,7 @@ export async function showMenu(context: AppContext, chatId: ChatId, messageId: n
   if (kind === "mode") return context.telegram.editMessageText(chatId, messageId, "Select execution mode:", modeKeyboard(context, chatId));
   if (kind === "sandbox") return context.telegram.editMessageText(chatId, messageId, `Sandbox is ${settingsFor(context, chatId).sandbox ? "enabled" : "disabled"}.`, sandboxKeyboard(context, chatId));
   if (kind === "verbose") return context.telegram.editMessageText(chatId, messageId, "Select progress verbosity during execution:", verboseKeyboard(context, chatId));
+  if (kind === "workspace" || kind === "workspaces") return context.telegram.editMessageText(chatId, messageId, "Select a project workspace:", workspaceKeyboard(context, chatId, page));
   if (kind === "session") return context.telegram.editMessageText(chatId, messageId, sessionText(context, chatId), backKeyboard());
   if (kind === "resume") return showResumeMenu(context, chatId, page, messageId);
   if (kind === "usage") { enqueueJob(context, chatId, { kind: "usage" }); return; }
