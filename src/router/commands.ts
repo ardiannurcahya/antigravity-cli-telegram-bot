@@ -77,7 +77,7 @@ command("/restart", "/restart_bot", "/restart-bot", "/reboot")(async ({ context,
 
 command("/models", "/model")(async ({ context, chatId, args }) => {
   if (!args[0] || args[0].toLowerCase() === "list") {
-    void refreshModels(context);
+    await refreshModels(context);
     await reply(context, chatId, "Select a model:", modelKeyboard(context, chatId, 0));
     return;
   }

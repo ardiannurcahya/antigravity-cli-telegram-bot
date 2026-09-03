@@ -11,6 +11,7 @@ import { modelKeyboard } from "../ui/inline-keyboards.js";
 import { reply, replyWithHtml } from "../ui/reply.js";
 import { showMain, showResumeMenu } from "../ui/screens.js";
 import { enqueueJob } from "../usecases/enqueue.js";
+import { refreshModels } from "../usecases/model-selection.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { authorizedMessage } from "./auth.js";
@@ -221,7 +222,11 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       await reply(context, sessionKey, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, sessionKey)));
       return;
     }
-    if (buttonText === "🤖 Model") { await reply(context, sessionKey, "Select a model:", modelKeyboard(context, sessionKey)); return; }
+    if (buttonText === "🤖 Model") {
+      await refreshModels(context);
+      await reply(context, sessionKey, "Select a model:", modelKeyboard(context, sessionKey));
+      return;
+    }
     if (buttonText === "📊 Quota" || buttonText === "📊 Usage / Quota" || buttonText === "📊 Usage") {
       enqueueJob(context, sessionKey, { kind: "usage" });
       return;

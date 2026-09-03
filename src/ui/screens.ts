@@ -17,6 +17,7 @@ import {
 import { resumeMessageText, sessionText, settingsText } from "./messages.js";
 import { reply, replyWithHtml } from "./reply.js";
 import { enqueueJob } from "../usecases/enqueue.js";
+import { refreshModels } from "../usecases/model-selection.js";
 import { settingsFor } from "../domain/settings.js";
 import type { ChatId, InlineKeyboardMarkup } from "../types.js";
 
@@ -94,7 +95,10 @@ export async function showCliOption(context: AppContext, chatId: ChatId, message
 
 export async function showMenu(context: AppContext, chatId: ChatId, messageId: number, kind: string, page = 0): Promise<void> {
   if (kind === "main") return showMain(context, chatId, messageId);
-  if (kind === "model" || kind === "models") return context.telegram.editMessageText(chatId, messageId, "Select a model:", modelKeyboard(context, chatId, page));
+  if (kind === "model" || kind === "models") {
+    await refreshModels(context);
+    return context.telegram.editMessageText(chatId, messageId, "Select a model:", modelKeyboard(context, chatId, page));
+  }
   if (kind === "effort") return context.telegram.editMessageText(chatId, messageId, "Select reasoning effort:", effortKeyboard(context, chatId));
   if (kind === "mode") return context.telegram.editMessageText(chatId, messageId, "Select execution mode:", modeKeyboard(context, chatId));
   if (kind === "sandbox") return context.telegram.editMessageText(chatId, messageId, `Sandbox is ${settingsFor(context, chatId).sandbox ? "enabled" : "disabled"}.`, sandboxKeyboard(context, chatId));

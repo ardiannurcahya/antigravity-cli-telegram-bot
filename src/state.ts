@@ -27,7 +27,7 @@ export class StateStore {
   public async resetSession(chatId: ChatId, preserveSettings = true): Promise<void> {
     const existing = this.data.sessions[String(chatId)];
     if (preserveSettings && existing?.settings) {
-      const { continueSession, newProject, ...restSettings } = existing.settings;
+      const { continueSession, newProject, model, effort, ...restSettings } = existing.settings;
       const hasCustomSettings = Object.values(restSettings).some((val) => val !== undefined && val !== null);
       if (hasCustomSettings) {
         this.data.sessions[String(chatId)] = {

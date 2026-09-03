@@ -164,24 +164,34 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         const isLatest = idx === recentSteps.length - 1;
         return `${isLatest ? "➜" : "✓"} ${s}`;
       });
-      const body = stepsDisplay.length ? `\n\n${stepsDisplay.join("\n")}` : "\n\nInitializing...";
+      let body: string;
+      if (stepsDisplay.length) {
+        body = `\n\n${stepsDisplay.join("\n")}`;
+      } else if (hasInitialized) {
+        body = "\n\n🤔 Thinking / connecting model...";
+      } else if (Number(elapsed) >= 3) {
+        body = "\n\n⚡ Loading skills & context...";
+      } else {
+        body = "\n\n🚀 Starting AGY session...";
+      }
       pendingEditContent = `⏳ AGY is working... (${elapsed}s · ${modelLabel(settings.model)})${body}`;
 
       void flushProgress();
     };
 
+    let hasInitialized = false;
     let lastEventReceivedAt = Date.now();
     heartbeatTimer = setInterval(() => {
       if (isCancelled() || controller.signal.aborted) return;
       const idleSec = Math.floor((Date.now() - lastEventReceivedAt) / 1000);
-      if (idleSec >= 6) {
+      if (idleSec >= 3) {
         updateProgress(null);
       }
-    }, 6000);
+    }, 2500);
 
     const progressTicker = setInterval(() => {
       updateProgress(null);
-    }, 6000);
+    }, 2500);
 
     let result;
     try {
@@ -205,6 +215,11 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         mediaType: job.mediaType,
         onEvent: (event: StreamEvent) => {
           lastEventReceivedAt = Date.now();
+          if (event.event === "init") {
+            hasInitialized = true;
+            updateProgress(null);
+            return;
+          }
           const step = event.step_update as Record<string, unknown> | undefined;
           const update = formatStepUpdate(step);
           updateProgress(update);

@@ -34,8 +34,10 @@ export function parseAgyModelsOutput(output: string): ModelOption[] {
   const lines = output.split(/\r?\n/);
   for (const rawLine of lines) {
     const cleaned = rawLine.replace(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏\s]+/g, "").trim();
-    if (!cleaned || /fetching available models/i.test(cleaned)) continue;
-    const match = cleaned.match(/^([a-z0-9_.-]+)\s+(.+)$/i);
+    if (!cleaned) continue;
+    const stripped = cleaned.replace(/.*fetching available models\.*\s*/i, "").trim();
+    if (!stripped) continue;
+    const match = stripped.match(/^([a-z0-9_.-]+)\s+(.+)$/i);
     if (match) {
       const id = match[1].trim();
       const label = match[2].trim();

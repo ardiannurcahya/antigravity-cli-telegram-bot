@@ -42,6 +42,9 @@ test("calculates max context limits and renders progress bar", () => {
 test("parseAgyModelsOutput parses raw CLI models output and updates active models", () => {
   const sampleOutput = `
 ⠋ Fetching available models...⠙ Fetching available models...
+gemini-3.8-flash-high     Gemini 3.8 Flash (High)
+gemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)
+gemini-3.8-flash-low      Gemini 3.8 Flash (Low)
 gemini-3.7-flash-high     Gemini 3.7 Flash (High)
 gemini-3.7-flash-medium   Gemini 3.7 Flash (Medium)
 gemini-3.7-flash-low      Gemini 3.7 Flash (Low)
@@ -49,19 +52,20 @@ gemini-3.1-pro-high       Gemini 3.1 Pro (High)
 claude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)
 `;
   const parsed = parseAgyModelsOutput(sampleOutput);
-  assert.equal(parsed.length, 5);
-  assert.equal(parsed[0].id, "gemini-3.7-flash-high");
-  assert.equal(parsed[0].label, "Gemini 3.7 Flash (High)");
-  assert.equal(parsed[1].id, "gemini-3.7-flash-medium");
-  assert.equal(parsed[2].id, "gemini-3.7-flash-low");
-  assert.equal(parsed[3].id, "gemini-3.1-pro-high");
-  assert.equal(parsed[3].maxContextWindow, 2_000_000);
-  assert.equal(parsed[4].id, "claude-sonnet-4-6");
-  assert.equal(parsed[4].maxContextWindow, 200_000);
+  assert.equal(parsed.length, 8);
+  assert.equal(parsed[0].id, "gemini-3.8-flash-high");
+  assert.equal(parsed[0].label, "Gemini 3.8 Flash (High)");
+  assert.equal(parsed[1].id, "gemini-3.8-flash-medium");
+  assert.equal(parsed[2].id, "gemini-3.8-flash-low");
+  assert.equal(parsed[3].id, "gemini-3.7-flash-high");
+  assert.equal(parsed[6].id, "gemini-3.1-pro-high");
+  assert.equal(parsed[6].maxContextWindow, 2_000_000);
+  assert.equal(parsed[7].id, "claude-sonnet-4-6");
+  assert.equal(parsed[7].maxContextWindow, 200_000);
 
   setActiveModels(parsed);
-  assert.equal(getActiveModels().length, 5);
-  assert.equal(getModelMaxContext("gemini-3.7-flash-medium"), 1_000_000);
+  assert.equal(getActiveModels().length, 8);
+  assert.equal(getModelMaxContext("gemini-3.8-flash-medium"), 1_000_000);
 });
 
 test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without obsolete 3.5 models", () => {
