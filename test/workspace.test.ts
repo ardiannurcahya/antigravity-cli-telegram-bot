@@ -8,8 +8,9 @@ import { StateStore } from "../src/state.js";
 import { effectiveWorkspaceFor, settingsFor } from "../src/domain/settings.js";
 import { handleCommand } from "../src/router/commands.js";
 import { handleCallback } from "../src/router/callbacks.js";
+import { handleUpdate } from "../src/router/updates.js";
 import { runPromptJob } from "../src/usecases/prompt-job.js";
-import type { AppConfig, AppContext, ChatId, TelegramMessage, TelegramCallbackQuery } from "../src/types.js";
+import type { AppConfig, AppContext, ChatId, TelegramMessage, TelegramCallbackQuery, TelegramUpdate } from "../src/types.js";
 
 test("isWithin correctly enforces path containment and blocks traversal", () => {
   const root = "/home/user/projects";
@@ -121,17 +122,22 @@ test("resetSession lifecycle: clears workspace in 1:1 DMs (Option A) and preserv
       },
     });
 
-    // Simulate /new in 1:1 DM (preserveSettings = true, preserveWorkspace = false)
-    await store.resetSession(dmChatId, true, false);
+    // Simulate /new in 1:1 DM par défaut (resetSession sans argument explicite pour preserveWorkspace)
+    await store.resetSession(dmChatId);
     const dmSession = store.session(dmChatId);
-    assert.equal(dmSession?.settings?.model, "gemini-2.5-pro", "Model should be preserved in DM");
-    assert.equal(dmSession?.settings?.workspace, null, "Workspace should be reset to null in DM");
+    assert.equal(dmSession?.settings?.mode, "plan", "Mode should be preserved in DM");
+    assert.equal(dmSession?.settings?.workspace, null, "Workspace should be reset to null in DM by default");
 
-    // Simulate /new in Forum Topic (preserveSettings = true, preserveWorkspace = true)
-    await store.resetSession(topicChatId, true, true);
+    // Simulate /new in Forum Topic par défaut (resetSession sans argument explicite pour preserveWorkspace)
+    await store.resetSession(topicChatId);
     const topicSession = store.session(topicChatId);
-    assert.equal(topicSession?.settings?.model, "gemini-2.5-pro", "Model should be preserved in Topic");
-    assert.equal(topicSession?.settings?.workspace, "/home/user/projects/topic-repo", "Workspace should be preserved in Topic");
+    assert.equal(topicSession?.settings?.mode, "plan", "Mode should be preserved in Topic");
+    assert.equal(topicSession?.settings?.workspace, "/home/user/projects/topic-repo", "Workspace should be preserved in Topic by default");
+
+    // Vérifier également qu'un appel explicite preserveWorkspace = true est honoré en DM
+    await store.setSession(dmChatId, { settings: { model: "gemini-2.5-pro", workspace: "/home/user/projects/dm-forced" } });
+    await store.resetSession(dmChatId, true, true);
+    assert.equal(store.session(dmChatId)?.settings?.workspace, "/home/user/projects/dm-forced");
   } finally {
     if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
   }
@@ -431,3 +437,119 @@ test("runPromptJob prefixes starting progress message with workspace banner when
     if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
   }
 });
+
+test("button '✨ New' and command '/new' reset workspace to default in 1:1 DM and preserve in Forum Topic", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-new-test-"));
+  const tempStateFile = path.join(tempDir, "state.json");
+  const defaultWs = path.join(tempDir, "default");
+  fs.mkdirSync(defaultWs, { recursive: true });
+
+  try {
+    const store = new StateStore(tempStateFile);
+    await store.load();
+
+    const mockTelegram = {
+      sendMessage: async () => ({ message_id: 123 }),
+      sendChatAction: async () => true,
+    };
+
+    const mockContext = {
+      config: {
+        agy: {
+          workspace: defaultWs,
+          projectsRoot: tempDir,
+          model: "gemini-2.5-flash",
+          effort: "high",
+          mode: "plan",
+          sandbox: false,
+          allowedModels: ["gemini-2.5-flash"],
+        },
+        telegram: {
+          allowedUserIds: ["1111", "2222"],
+          verbose: "detailed",
+          tempDir: path.join(tempDir, "tmp"),
+        },
+        tempDir: path.join(tempDir, "tmp"),
+      },
+      state: store,
+      telegram: mockTelegram,
+    } as unknown as AppContext;
+
+    // 1. En chat privé (1:1 DM), le bouton "✨ New" réinitialise le workspace à null
+    const dmChatId = 1111;
+    await store.setSession(dmChatId, {
+      settings: {
+        model: "gemini-2.5-flash",
+        workspace: "/home/user/projects/dm-repo",
+      },
+    });
+    assert.equal(settingsFor(mockContext, dmChatId).workspace, "/home/user/projects/dm-repo");
+
+    await handleUpdate(mockContext, {
+      update_id: 1,
+      message: {
+        message_id: 10,
+        date: Date.now(),
+        chat: { id: dmChatId, type: "private" },
+        from: { id: dmChatId, is_bot: false },
+        text: "✨ New",
+      },
+    });
+    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "Le bouton ✨ New doit réinitialiser le workspace en DM");
+
+    // 2. En chat privé (1:1 DM), la commande /new réinitialise le workspace à null
+    await store.setSession(dmChatId, {
+      settings: {
+        model: "gemini-2.5-flash",
+        workspace: "/home/user/projects/dm-repo",
+      },
+    });
+    const dmMsg: TelegramMessage = {
+      message_id: 11,
+      date: Date.now(),
+      chat: { id: dmChatId, type: "private" },
+      from: { id: dmChatId, is_bot: false },
+      text: "/new",
+    };
+    await handleCommand(mockContext, dmMsg, "/new", []);
+    assert.equal(settingsFor(mockContext, dmChatId).workspace, null, "La commande /new doit réinitialiser le workspace en DM");
+
+    // 3. En Forum Topic, le bouton "✨ New" conserve le workspace
+    const topicChatId = 2222;
+    const threadId = 55;
+    const topicSessionKey = `${topicChatId}:${threadId}`;
+    await store.setSession(topicSessionKey, {
+      settings: {
+        model: "gemini-2.5-flash",
+        workspace: "/home/user/projects/topic-repo",
+      },
+    });
+    await handleUpdate(mockContext, {
+      update_id: 2,
+      message: {
+        message_id: 20,
+        message_thread_id: threadId,
+        date: Date.now(),
+        chat: { id: topicChatId, type: "supergroup" },
+        from: { id: 2222, is_bot: false },
+        text: "✨ New",
+      },
+    });
+    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "Le bouton ✨ New doit préserver le workspace en Forum Topic");
+
+    // 4. En Forum Topic, la commande /new conserve le workspace
+    const topicMsg: TelegramMessage = {
+      message_id: 21,
+      message_thread_id: threadId,
+      date: Date.now(),
+      chat: { id: topicChatId, type: "supergroup" },
+      from: { id: 2222, is_bot: false },
+      text: "/new",
+    };
+    await handleCommand(mockContext, topicMsg, "/new", []);
+    assert.equal(settingsFor(mockContext, topicSessionKey).workspace, "/home/user/projects/topic-repo", "La commande /new doit préserver le workspace en Forum Topic");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+

@@ -210,7 +210,8 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     const buttonText = text;
     if (buttonText === "✨ New session" || buttonText === "✨ New") {
       await cleanupSessionTempFiles(context.config.tempDir, sessionKey);
-      await context.state.resetSession(sessionKey);
+      const isTopic = Boolean(message?.message_thread_id) || String(sessionKey).includes(":");
+      await context.state.resetSession(sessionKey, true, isTopic);
       await replyWithHtml(context, sessionKey, sessionInfoHtml(context, sessionKey), createMainKeyboard(settingsFor(context, sessionKey)));
       return;
     }

@@ -70,12 +70,14 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
     case "update-bot":
       await updateBot(context, chatId, messageId);
       return;
-    case "new-session":
+    case "new-session": {
       await cleanupSessionTempFiles(context.config.tempDir, chatId);
-      await context.state.resetSession(chatId);
+      const isTopic = Boolean(callback.message?.message_thread_id) || String(chatId).includes(":");
+      await context.state.resetSession(chatId, true, isTopic);
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
       await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
+    }
     case "cancel": {
       const result = context.queue.cancelForChat(chatId);
       await context.telegram.editMessageText(chatId, messageId, `Cancelled: ${result.removed} queued, active=${result.activeCancelled ? "yes" : "no"}.`, { inline_keyboard: [] });
@@ -168,7 +170,7 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     if (value === "clear" || value === "default" || value === "reset") {
       settings.workspace = null;
       await saveSettings(context, chatId, settings);
-      await context.state.resetSession(chatId);
+      await context.state.resetSession(chatId, true, false);
       await context.telegram.editMessageText(
         chatId,
         messageId,
@@ -192,7 +194,7 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     }
     settings.workspace = resolution.resolvedPath;
     await saveSettings(context, chatId, settings);
-    await context.state.resetSession(chatId);
+    await context.state.resetSession(chatId, true, true);
     await context.telegram.editMessageText(
       chatId,
       messageId,

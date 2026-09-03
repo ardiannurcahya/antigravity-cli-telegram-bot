@@ -60,7 +60,7 @@ command("/help")(async ({ context, chatId }) => {
 
 command("/new")(async ({ context, chatId, message }) => {
   await cleanupSessionTempFiles(context.config.tempDir, chatId);
-  const isTopic = Boolean(message?.message_thread_id);
+  const isTopic = Boolean(message?.message_thread_id) || String(chatId).includes(":");
   await context.state.resetSession(chatId, true, isTopic);
   await replyWithHtml(context, chatId, sessionInfoHtml(context, chatId), createMainKeyboard(settingsFor(context, chatId)));
 });
@@ -305,7 +305,7 @@ command("/workspace")(async ({ context, chatId, args }) => {
   if (sub === "clear" || sub === "reset" || sub === "default") {
     currentSettings.workspace = null;
     await saveSettings(context, chatId, currentSettings);
-    await context.state.resetSession(chatId);
+    await context.state.resetSession(chatId, true, false);
     await replyWithHtml(
       context,
       chatId,
@@ -329,7 +329,7 @@ command("/workspace")(async ({ context, chatId, args }) => {
 
   currentSettings.workspace = resolution.resolvedPath;
   await saveSettings(context, chatId, currentSettings);
-  await context.state.resetSession(chatId);
+  await context.state.resetSession(chatId, true, true);
   await replyWithHtml(
     context,
     chatId,
