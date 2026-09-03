@@ -14,6 +14,8 @@ Historiquement développé sur une version personnalisée (`agy-telegram-custom`
 - [x] **PR #22** : Rendu propre des liens de conversation `conversation://` et de fichiers `file://` en HTML Telegram, durcissement de l'analyse des commandes AGY et résilience SQLite. *(Fusionnée dans upstream/main)*
 - [x] **PR #23** : Prise en charge des documents images non compressés, résilience réseau avec backoff pour les téléchargements de fichiers et gestion du cycle de vie des fichiers temporaires (purge sur `/new` et fichiers de plus de 24h). *(Fusionnée dans upstream/main)*
   - Lien : https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/23
+- [~] **PR #28** : Isolation de workspace par session et topic (`/workspace`) selon le modèle d'architecture Option A avec autocomplétion, claviers inline, notice visuelle et confinement de sécurité (`isWithin`). *(Ouverte et en cours de revue sur upstream/main, clôture l'issue #26)*
+  - Lien : https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/28
 - [x] **Finalisation de la bascule sur le fork officiel** :
   - Procédure de bascule exécutée avec succès (alignement sur upstream/main, synchronisation sur fork/main, suppression de la branche locale fix, compilation TypeScript et redémarrage du service systemd).
 
@@ -52,7 +54,7 @@ systemctl --user restart agy-telegram
 
 ## 3. Améliorations futures et pistes d'évolution
 
-- [x] **Isolation de workspace par session et topic (/workspace)** : Portée dynamique du répertoire de travail (`cwd`), autocomplétion native Telegram et sélection interactive par boutons inline, résolution flexible avec préfixe slash (`/`), rappel visuel du workspace forcé au prompt, réinitialisation éphémère en DM 1:1 sur `/new` (Option A) et persistance par forum topic, sécurisé par vérification de confinement (`isWithin`) ([Issue #26](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/26), [Spécifications](docs/specs/per-session-workspace-isolation.md)).
+- [x] **Isolation de workspace par session et topic (/workspace)** : Portée dynamique du répertoire de travail (`cwd`), autocomplétion native Telegram et sélection interactive par boutons inline, résolution flexible avec préfixe slash (`/`), rappel visuel du workspace forcé au prompt, réinitialisation éphémère en DM 1:1 sur `/new` (Option A) et persistance par forum topic, sécurisé par vérification de confinement (`isWithin`) ([Issue #26](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/26), [PR #28](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/28), [Spécifications](docs/specs/per-session-workspace-isolation.md)).
 - [ ] **Transcription vocale automatique (Speech-to-Text / STT)** : Transcription automatique des messages vocaux Telegram en prompts textuels directs via Gemini Speech ou Whisper ([Spécifications](docs/specs/speech-to-text-transcription.md)).
 - [ ] **Internationalisation (i18n)** : Possibilité de configurer la langue des messages système du bot (français / anglais).
 - [ ] **Gestion avancée des quotas** : Alertes Telegram paramétrables lorsque le quota approche d'un seuil critique (ex. 80 %).
