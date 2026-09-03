@@ -200,12 +200,12 @@ test("callbacks: set:model persists model+effort and offers permanent default", 
   const harness = createHarness();
   const ctx = asAppContext(harness);
   try {
-    await handleCallback(ctx, callbackUpdate("set:model:gemini-3.5-flash-medium"));
+    await handleCallback(ctx, callbackUpdate("set:model:gemini-3.7-flash-medium"));
     const settings = ctx.state.session(777)?.settings;
-    assert.equal(settings?.model, "gemini-3.5-flash-medium");
+    assert.equal(settings?.model, "gemini-3.7-flash-medium");
     assert.equal(settings?.effort, "medium");
     const edit = harness.telegram.lastPayload("editMessageText");
-    assert.equal(edit?.text, "Model set to <b>Gemini 3.5 Flash (Medium)</b>.\n\nWould you like to set this as your permanent default?");
+    assert.equal(edit?.text, "Model set to <b>Gemini 3.7 Flash (Medium)</b>.\n\nWould you like to set this as your permanent default?");
     assert.deepEqual(JSON.parse(JSON.stringify((edit?.reply_markup as { inline_keyboard: string[][] }).inline_keyboard)), [
       [{ text: "⭐ Yes, set as Default", callback_data: "action:setdefault" }, { text: "👌 Only this session", callback_data: "menu:main" }],
     ]);

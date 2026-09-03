@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadConfig } from "../src/config.js";
-import { getActiveModels, getModelMaxContext, parseAgyModelsOutput, renderContextProgressBar, setActiveModels } from "../src/models.js";
+import { DEFAULT_MODELS, getActiveModels, getModelMaxContext, parseAgyModelsOutput, renderContextProgressBar, setActiveModels } from "../src/models.js";
 
 const base = { TELEGRAM_BOT_TOKEN: "token", TELEGRAM_ALLOWED_USER_IDS: "123,456", AGY_WORKSPACE: "/srv/workspace" };
 test("loads full-control defaults and allowlist", () => { const config = loadConfig(base); assert.deepEqual(config.telegram.allowedUserIds, ["123", "456"]); assert.equal(config.telegram.privateOnly, true); assert.equal(config.agy.mode, "plan"); assert.equal(config.agy.sandbox, false); assert.equal(config.agy.allowSandboxDisable, true); assert.equal(config.agy.allowDangerouslySkipPermissions, false); assert.equal(config.agy.effort, "high"); assert.ok(config.agy.allowedModels.includes("gemini-3.7-flash-high")); assert.ok(config.agy.allowedModels.includes("claude-sonnet-4-6")); });
@@ -30,6 +30,7 @@ test("supports configurable telegram verbose level", () => {
 });
 
 test("calculates max context limits and renders progress bar", () => {
+  assert.equal(getModelMaxContext("gemini-3.8-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("gemini-3.7-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("gemini-3.6-flash-high"), 1_000_000);
   assert.equal(getModelMaxContext("claude-sonnet-4-6"), 200_000);
@@ -61,4 +62,24 @@ claude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)
   setActiveModels(parsed);
   assert.equal(getActiveModels().length, 5);
   assert.equal(getModelMaxContext("gemini-3.7-flash-medium"), 1_000_000);
+});
+
+test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without obsolete 3.5 models", () => {
+  const ids = DEFAULT_MODELS.map((m) => m.id);
+  assert.ok(!ids.some((id) => id.includes("gemini-3.5")), "gemini-3.5 models must not be in DEFAULT_MODELS");
+  assert.ok(ids.includes("gemini-3.8-flash-high"));
+  assert.ok(ids.includes("gemini-3.8-flash-medium"));
+  assert.ok(ids.includes("gemini-3.8-flash-low"));
+  assert.ok(ids.includes("gemini-3.7-flash-high"));
+  assert.ok(ids.includes("gemini-3.7-flash-medium"));
+  assert.ok(ids.includes("gemini-3.7-flash-low"));
+  assert.ok(ids.includes("gemini-3.6-flash-high"));
+  assert.ok(ids.includes("gemini-3.6-flash-medium"));
+  assert.ok(ids.includes("gemini-3.6-flash-low"));
+  assert.ok(ids.includes("gemini-3.1-pro-high"));
+  assert.ok(ids.includes("gemini-3.1-pro-low"));
+  assert.ok(ids.includes("claude-sonnet-4-6"));
+  assert.ok(ids.includes("claude-opus-4-6-thinking"));
+  assert.ok(ids.includes("gpt-oss-120b-medium"));
+  assert.equal(ids.length, 14);
 });
