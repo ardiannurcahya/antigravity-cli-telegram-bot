@@ -38,6 +38,7 @@ service under a dedicated Unix user.
 - [Security Model](#security-model)
 - [Development](#development)
 - [Project Structure](#project-structure)
+- [Ecosystem & Complementary Tools](#ecosystem--complementary-tools)
 - [Limitations](#limitations)
 - [Contributing](#contributing)
 - [License](#license)
@@ -618,6 +619,10 @@ test/                           # Node Test Runner Suite (120 automated tests)
 deploy/                         # Production systemd service unit & environment template
 .github/workflows/              # CI/CD, TypeScript build, and npm publish workflows
 ```
+
+## Ecosystem & Complementary Tools
+
+- **[agy-memory-engine](https://github.com/sbolten/agy-memory-engine)** — A lightweight, local 4-layer cognitive long-term memory engine (Facts, Narrative Episodes, Learnings, Entity Graph) for Google Antigravity. Using AGY's lifecycle hooks, conversation turns from Telegram are automatically enqueued in `< 1ms` and consolidated into persistent SQLite FTS5 memory in the background with calm-memory session debouncing.
 
 ## Limitations
 
