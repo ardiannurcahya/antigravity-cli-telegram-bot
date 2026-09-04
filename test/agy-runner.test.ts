@@ -168,48 +168,49 @@ test("formats subagent updates with role or name", () => {
 test("isolates multi-turn intermediate preambles even when response concatenates with single newlines", () => {
   const stdout = [
     JSON.stringify({ event: "init", conversation_id: "conv-multi", init: { model: "gemini-3.8-flash" } }),
-    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "Le sous-agent a été lancé." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "Subagent has been launched." } }),
     JSON.stringify({ event: "step_update", step_update: { step_type: "subagent", subagent_info: { name: "research" } } }),
-    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "La vérification est en cours." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "Verification is in progress." } }),
     JSON.stringify({ event: "step_update", step_update: { step_type: "tool", tool_info: { name: "manage_subagents" } } }),
-    JSON.stringify({ event: "step_update", step_update: { text_delta: "Synthèse finale : Node v24.20.0 LTS." } }),
+    JSON.stringify({ event: "step_update", step_update: { text_delta: "Final summary: Node v24.20.0 LTS." } }),
     JSON.stringify({
       event: "result",
       result: {
         conversation_id: "conv-multi",
         status: "SUCCESS",
-        response: "Le sous-agent a été lancé.\nLa vérification est en cours.\nSynthèse finale : Node v24.20.0 LTS.",
+        response: "Subagent has been launched.\nVerification is in progress.\nFinal summary: Node v24.20.0 LTS.",
       },
     }),
   ].join("\n");
   const parsed = parseStreamOutput(stdout);
-  assert.equal(parsed.intermediateText, "Le sous-agent a été lancé.\n\nLa vérification est en cours.");
-  assert.equal(parsed.text, "Synthèse finale : Node v24.20.0 LTS.");
+  assert.equal(parsed.intermediateText, "Subagent has been launched.\n\nVerification is in progress.");
+  assert.equal(parsed.text, "Final summary: Node v24.20.0 LTS.");
   assert.equal(parsed.toolCalls, 2);
 });
 
 test("isolates intermediate waiting turns followed by system messages without intervening tools", () => {
   const stdout = [
     JSON.stringify({ event: "init", conversation_id: "conv-wait", init: { model: "gemini-3.8-flash" } }),
-    JSON.stringify({ event: "step_update", step_update: { step_index: 1, step_type: "agent_response", text_delta: "Le sous-agent a été mandaté." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 1, step_type: "agent_response", text_delta: "Subagent has been dispatched." } }),
     JSON.stringify({ event: "step_update", step_update: { step_index: 2, step_type: "subagent", subagent_info: { name: "research" } } }),
-    JSON.stringify({ event: "step_update", step_update: { step_index: 3, step_type: "agent_response", text_delta: "Le sous-agent est en train de finaliser la synthèse." } }),
-    JSON.stringify({ event: "step_update", step_update: { step_index: 4, step_type: "system_message", text_delta: "Rapport reçu du sous-agent." } }),
-    JSON.stringify({ event: "step_update", step_update: { step_index: 5, step_type: "agent_response", text_delta: "Voici les informations officielles : Node v24.20.0." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 3, step_type: "agent_response", text_delta: "Subagent is finalizing the comparative summary." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 4, step_type: "system_message", text_delta: "Report received from subagent." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 5, step_type: "agent_response", text_delta: "Here are the official findings: Node v24.20.0." } }),
     JSON.stringify({
       event: "result",
       result: {
         conversation_id: "conv-wait",
         status: "SUCCESS",
-        response: "Le sous-agent a été mandaté.\nLe sous-agent est en train de finaliser la synthèse.\nVoici les informations officielles : Node v24.20.0.",
+        response: "Subagent has been dispatched.\nSubagent is finalizing the comparative summary.\nHere are the official findings: Node v24.20.0.",
       },
     }),
   ].join("\n");
   const parsed = parseStreamOutput(stdout);
-  assert.equal(parsed.intermediateText, "Le sous-agent a été mandaté.\n\nLe sous-agent est en train de finaliser la synthèse.");
-  assert.equal(parsed.text, "Voici les informations officielles : Node v24.20.0.");
+  assert.equal(parsed.intermediateText, "Subagent has been dispatched.\n\nSubagent is finalizing the comparative summary.");
+  assert.equal(parsed.text, "Here are the official findings: Node v24.20.0.");
   assert.equal(parsed.toolCalls, 1);
 });
+
 
 
 
