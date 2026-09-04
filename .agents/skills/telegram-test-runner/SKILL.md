@@ -37,17 +37,21 @@ npm run build
 ```
 
 ### Étape 2 : Lancement du runner temporaire de test
-Démarrer le bot de test en tâche complètement détachée pour ne jamais bloquer la session CLI ni suspendre la passerelle Telegram :
+Démarrer le bot de test en tâche complètement détachée pour ne jamais bloquer la session CLI ni suspendre la passerelle Telegram.
+
+La méthode recommandée sous Linux est d'utiliser une unité transitoire systemd utilisateur :
 
 ```bash
-nohup env AGY_ENV_FILE="$HOME/.config/agy-telegram-test/.env" node dist/cli.js > "$HOME/.config/agy-telegram-test/runner.log" 2>&1 & echo $! > "$HOME/.config/agy-telegram-test/runner.pid"
+systemd-run --user --unit=agy-telegram-test env AGY_ENV_FILE="$HOME/.config/agy-telegram-test/.env" node /home/med/projets/agy-telegram/dist/cli.js
 ```
 
-> ⚠️ **Directive stricte pour l'agent :** Ne JAMAIS lancer ce processus directement ou en tâche d'arrière-plan interne Antigravity (`run_command` sans détachement complet `nohup ... &`). En mode non-interactif (`agy --print`), le processus parent resterait bloqué indéfiniment en attendant la fin du sous-processus. Le lancement doit impérativement être détaché et enregistrer son PID.
+*(Alternative sans systemd : `nohup env AGY_ENV_FILE="$HOME/.config/agy-telegram-test/.env" node dist/cli.js < /dev/null > "$HOME/.config/agy-telegram-test/runner.log" 2>&1 & echo $! > "$HOME/.config/agy-telegram-test/runner.pid"`)*
+
+> ⚠️ **Directive stricte pour l'agent :** Ne JAMAIS lancer ce processus directement ou en tâche d'arrière-plan interne Antigravity (`run_command` sans détachement complet). En mode non-interactif (`agy --print`), le processus parent resterait bloqué indéfiniment en attendant la fin du sous-processus.
 
 Vérifier immédiatement le bon démarrage sans erreur dans le journal :
 ```bash
-sleep 1 && tail -n 15 "$HOME/.config/agy-telegram-test/runner.log"
+journalctl --user -u agy-telegram-test --no-pager -n 15
 ```
 
 ### Étape 3 : Validation interactive sur Telegram
@@ -55,23 +59,17 @@ sleep 1 && tail -n 15 "$HOME/.config/agy-telegram-test/runner.log"
 2. Exécuter les scénarios de test ciblés par l'évolution :
    * Commandes usuelles (`/start`, `/menu`, `/model`, `/workspace`, etc.).
    * Prompts spécifiques testant la nouvelle fonctionnalité.
-   * Vérification des transitions, retours visuels et absence d'erreur dans la console ou `runner.log`.
+   * Vérification des transitions, retours visuels et absence d'erreur dans les journaux (`journalctl --user -u agy-telegram-test -f`).
 
 ### Étape 4 : Arrêt obligatoire dès soumission de la pull request
 > ⚠️ **Règle absolue :** Dès que la validation est concluante et que la pull request vers l'amont (*upstream*) est ouverte et soumise, **le runner temporaire de test doit être immédiatement arrêté**.
 
-Arrêter le processus via son fichier PID :
+Arrêter l'unité transitoire systemd :
 ```bash
-if [ -f "$HOME/.config/agy-telegram-test/runner.pid" ]; then
-  kill "$(cat "$HOME/.config/agy-telegram-test/runner.pid")" 2>/dev/null || true
-  rm -f "$HOME/.config/agy-telegram-test/runner.pid"
-fi
+systemctl --user stop agy-telegram-test
 ```
 
-En cas de PID orphelin, forcer l'arrêt du processus de test ciblé :
-```bash
-pkill -f "node dist/cli.js" 2>/dev/null || true
-```
+*(En méthode alternative PID : `[ -f "$HOME/.config/agy-telegram-test/runner.pid" ] && kill "$(cat "$HOME/.config/agy-telegram-test/runner.pid")" 2>/dev/null && rm -f "$HOME/.config/agy-telegram-test/runner.pid"`)*
 
 ---
 
@@ -80,6 +78,6 @@ pkill -f "node dist/cli.js" 2>/dev/null || true
 Action | Commande
 :--- | :---
 **Compiler** | `npm run build`
-**Lancer le runner détaché** | `nohup env AGY_ENV_FILE="$HOME/.config/agy-telegram-test/.env" node dist/cli.js > "$HOME/.config/agy-telegram-test/runner.log" 2>&1 & echo $! > "$HOME/.config/agy-telegram-test/runner.pid"`
-**Vérifier le statut** | `tail -n 15 "$HOME/.config/agy-telegram-test/runner.log"`
-**Arrêter le runner de test** | `kill "$(cat "$HOME/.config/agy-telegram-test/runner.pid")" 2>/dev/null && rm -f "$HOME/.config/agy-telegram-test/runner.pid"`
+**Lancer le runner (systemd)** | `systemd-run --user --unit=agy-telegram-test env AGY_ENV_FILE="$HOME/.config/agy-telegram-test/.env" node /home/med/projets/agy-telegram/dist/cli.js`
+**Vérifier le statut / logs** | `journalctl --user -u agy-telegram-test --no-pager -n 15`
+**Arrêter le runner de test** | `systemctl --user stop agy-telegram-test`
