@@ -99,7 +99,7 @@ function renderTelegramBlocks(text: string): string[] {
       continue;
     }
 
-    // Preformatted HTML Blockquote
+    // Preformatted HTML Blockquote with inner content sanitization
     if (line.match(/^\s*<blockquote(?:\s+expandable)?>/i)) {
       const htmlBlockLines: string[] = [];
       while (i < lines.length) {
@@ -107,14 +107,29 @@ function renderTelegramBlocks(text: string): string[] {
         if (/<\/blockquote>/i.test(lines[i])) break;
         i++;
       }
-      if (output.length > 0 && output[output.length - 1] !== "") {
-        output.push("");
+      const fullBlock = htmlBlockLines.join("\n");
+      const match = fullBlock.match(/^\s*(<blockquote(?:\s+expandable)?>)([\s\S]*?)(?:<\/blockquote>([\s\S]*))?$/i);
+      if (match) {
+        const openTag = match[1];
+        const innerContent = match[2];
+        const trailing = (match[3] || "").trim();
+        const formattedInner = innerContent
+          .split("\n")
+          .map((l) => formatInlineHtml(l))
+          .join("\n");
+
+        if (output.length > 0 && output[output.length - 1] !== "") {
+          output.push("");
+        }
+        output.push(`${openTag}${formattedInner}</blockquote>`);
+        if (trailing) {
+          output.push(formatInlineHtml(trailing));
+        }
+        if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+          output.push("");
+        }
+        continue;
       }
-      output.push(htmlBlockLines.join("\n"));
-      if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
-        output.push("");
-      }
-      continue;
     }
 
     // Blockquote & GitHub Alerts

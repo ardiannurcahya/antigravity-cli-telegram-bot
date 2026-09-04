@@ -152,6 +152,19 @@ test("preserves preformatted HTML expandable blockquotes and chunking", () => {
   }
 });
 
+test("sanitizes HTML injection and escapes reserved characters inside preformatted blockquotes", () => {
+  const dangerous = '<blockquote expandable><script>alert("xss")</script>\n<a href="https://phishing.com">malicious</a>\nx < 10 & y > 20</blockquote>';
+  const html = formatTelegramHtml(dangerous);
+
+  assert.ok(html.startsWith("<blockquote expandable>"));
+  assert.ok(html.endsWith("</blockquote>"));
+  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<a href="https:\/\/phishing\.com">/);
+  assert.ok(html.includes("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;"));
+  assert.ok(html.includes("&lt;a href=&quot;https://phishing.com&quot;&gt;malicious&lt;/a&gt;"));
+  assert.ok(html.includes("x &lt; 10 &amp; y &gt; 20"));
+});
+
 test("formats interactive checkboxes and hierarchical nested lists", () => {
   const markdown = "- [ ] Pending task\n- [x] Completed task\n- Top level bullet\n  - Sub bullet level 2\n    - Deep bullet level 3";
   const html = formatTelegramHtml(markdown);
