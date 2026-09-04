@@ -188,4 +188,28 @@ test("isolates multi-turn intermediate preambles even when response concatenates
   assert.equal(parsed.toolCalls, 2);
 });
 
+test("isolates intermediate waiting turns followed by system messages without intervening tools", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-wait", init: { model: "gemini-3.8-flash" } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 1, step_type: "agent_response", text_delta: "Le sous-agent a été mandaté." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 2, step_type: "subagent", subagent_info: { name: "research" } } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 3, step_type: "agent_response", text_delta: "Le sous-agent est en train de finaliser la synthèse." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 4, step_type: "system_message", text_delta: "Rapport reçu du sous-agent." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 5, step_type: "agent_response", text_delta: "Voici les informations officielles : Node v24.20.0." } }),
+    JSON.stringify({
+      event: "result",
+      result: {
+        conversation_id: "conv-wait",
+        status: "SUCCESS",
+        response: "Le sous-agent a été mandaté.\nLe sous-agent est en train de finaliser la synthèse.\nVoici les informations officielles : Node v24.20.0.",
+      },
+    }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.intermediateText, "Le sous-agent a été mandaté.\n\nLe sous-agent est en train de finaliser la synthèse.");
+  assert.equal(parsed.text, "Voici les informations officielles : Node v24.20.0.");
+  assert.equal(parsed.toolCalls, 1);
+});
+
+
 
