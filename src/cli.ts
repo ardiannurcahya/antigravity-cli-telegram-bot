@@ -32,8 +32,9 @@ complete configuration and deployment guide.`);
 
 const envFile = process.env.AGY_ENV_FILE || defaultEnvFile();
 const savedEnv = await loadEnvFile(envFile);
+const explicitEnv = Boolean(process.env.AGY_ENV_FILE);
 for (const [key, value] of Object.entries(savedEnv)) {
-  if (process.env[key] === undefined) process.env[key] = value;
+  if (explicitEnv || process.env[key] === undefined) process.env[key] = value;
 }
 if (process.argv.includes("--setup") || !process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_ALLOWED_USER_IDS) {
   const configured = await runSetup(process.env, envFile);
