@@ -16,6 +16,8 @@ Historiquement développé sur une version personnalisée (`agy-telegram-custom`
   - Lien : https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/23
 - [x] **PR #28** : Isolation de workspace par session et topic (`/workspace`) selon le modèle d'architecture Option A avec autocomplétion, claviers inline, notice visuelle et confinement de sécurité (`isWithin`). *(Fusionnée dans upstream/main, clôture l'issue #26)*
   - Lien : https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/28
+- [x] **PR #30** : Isolation des tours intermédiaires de délégation et de sous-agents dans des citations dépliables natives Telegram (`<blockquote expandable>`), avec ticker télémétrique compact et respect des modes de verbosité (`verbose: "detailed"` vs `compact`). *(Soumise vers upstream/main, clôture l'issue #29)*
+  - Lien : https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/30
 - [x] **Finalisation de la bascule sur le fork officiel et intégration de la PR #28** :
   - Procédure de synchronisation exécutée avec succès (alignement sur upstream/main, synchronisation sur fork/main, suppression de la branche locale de feature, compilation TypeScript et redémarrage du service systemd).
 
@@ -60,6 +62,6 @@ systemctl --user restart agy-telegram
 - [ ] **Internationalisation (i18n)** : Possibilité de configurer la langue des messages système du bot (français / anglais).
 - [ ] **Gestion avancée des quotas** : Alertes Telegram paramétrables lorsque le quota approche d'un seuil critique (ex. 80 %).
 - [ ] **Commandes rapides personnalisées** : Permettre la définition d'alias de prompts personnalisés depuis l'interface utilisateur.
-- [~] **Affichage en direct des transitions d'agents et délégation de sous-agents (Option 2.5)** : Ticker de progression compact et télémétrique pendant l'exécution, isolation des tours intermédiaires dans le flux de réponse et restitution sous forme de bloc de citation dépliable Telegram (`<blockquote expandable>`), évitant toute pollution du compte-rendu final ([Issue #29](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/29), [Spécifications](docs/specs/subagent-delegation-turn-isolation.md)). *(En cours de qualification sur le bot de test dédié)*
+- [x] **Affichage en direct des transitions d'agents et délégation de sous-agents (Option 2.5)** : Ticker de progression compact et télémétrique pendant l'exécution, isolation des tours intermédiaires dans le flux de réponse et restitution sous forme de bloc de citation dépliable Telegram (`<blockquote expandable>`), évitant toute pollution du compte-rendu final ([Issue #29](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/issues/29), [PR #30](https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/pull/30), [Spécifications](docs/specs/subagent-delegation-turn-isolation.md)). *(Qualifié à 100 % sur bot de test dédié et soumis en PR)*
 - [x] **Environnement de recette et bot Telegram dédié aux tests** : Mise en place de la compétence locale de projet ([telegram-test-runner](.agents/skills/telegram-test-runner/SKILL.md)) et configuration isolée (`~/.config/agy-telegram-test/.env`) pour valider les évolutions sur le bot de test dédié (`8797558243`) avec cycle de vie éphémère (fermeture impérative du runner temporaire dès soumission de la PR).
 
