@@ -99,11 +99,34 @@ function renderTelegramBlocks(text: string): string[] {
       continue;
     }
 
+    // Preformatted HTML Blockquote
+    if (line.match(/^\s*<blockquote(?:\s+expandable)?>/i)) {
+      const htmlBlockLines: string[] = [];
+      while (i < lines.length) {
+        htmlBlockLines.push(lines[i]);
+        if (/<\/blockquote>/i.test(lines[i])) break;
+        i++;
+      }
+      if (output.length > 0 && output[output.length - 1] !== "") {
+        output.push("");
+      }
+      output.push(htmlBlockLines.join("\n"));
+      if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+        output.push("");
+      }
+      continue;
+    }
+
     // Blockquote & GitHub Alerts
-    if (line.match(/^\s*>/)) {
+    if (line.match(/^\s*(?:\*\*>|>)/)) {
+      const isExpandable = /^\s*\*\*>/.test(line);
       const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].match(/^\s*>/)) {
-        quoteLines.push(lines[i].replace(/^\s*>\s?/, ""));
+      while (i < lines.length && (isExpandable ? /^\s*(?:\*\*>|>)/.test(lines[i]) : /^\s*>/.test(lines[i]))) {
+        let qLine = lines[i].replace(isExpandable ? /^\s*(?:\*\*>|>)\s?/ : /^\s*>\s?/, "");
+        if (isExpandable && qLine.endsWith("**") && (qLine.match(/\*\*/g) || []).length % 2 === 1) {
+          qLine = qLine.slice(0, -2);
+        }
+        quoteLines.push(qLine);
         i++;
       }
       i--; // loop will increment i
@@ -130,9 +153,10 @@ function renderTelegramBlocks(text: string): string[] {
       }
 
       const formattedQuote = quoteLines.map((q) => formatInlineHtml(q)).join("\n");
+      const openTag = isExpandable ? "<blockquote expandable>" : "<blockquote>";
       const finalQuoteHtml = alertHeader
-        ? `<blockquote>${alertHeader}\n${formattedQuote}</blockquote>`
-        : `<blockquote>${formattedQuote}</blockquote>`;
+        ? `${openTag}${alertHeader}\n${formattedQuote}</blockquote>`
+        : `${openTag}${formattedQuote}</blockquote>`;
 
       if (output.length > 0 && output[output.length - 1] !== "") {
         output.push("");
@@ -307,12 +331,13 @@ function splitOversizedHtmlBlock(block: string, maxChars: number): string[] {
     const contentLimit = Math.max(1, maxChars - open.length - close.length);
     return splitMessage(code[2], contentLimit).map((part) => `${open}${part}${close}`);
   }
-  const quote = block.match(/^<blockquote>([\s\S]*)<\/blockquote>$/);
+  const quote = block.match(/^<blockquote(\s+expandable)?>([\s\S]*)<\/blockquote>$/);
   if (quote) {
-    const open = "<blockquote>";
+    const attr = quote[1] || "";
+    const open = `<blockquote${attr}>`;
     const close = "</blockquote>";
     const contentLimit = Math.max(1, maxChars - open.length - close.length);
-    return splitMessage(quote[1], contentLimit).map((part) => `${open}${part}${close}`);
+    return splitMessage(quote[2], contentLimit).map((part) => `${open}${part}${close}`);
   }
   return splitMessage(stripHtmlTags(block), maxChars).map(escapeHtml);
 }

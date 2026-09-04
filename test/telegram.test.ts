@@ -132,6 +132,26 @@ test("formats blockquotes and GitHub-style alerts into native Telegram blockquot
   assert.ok(html.includes("<blockquote>Standard quoted text</blockquote>"));
 });
 
+test("formats expandable blockquotes into native Telegram expandable blockquotes", () => {
+  const markdown = "**> 🤖 Context & delegation:**\n**> I will delegate to research.\n\nFinal answer.";
+  const html = formatTelegramHtml(markdown);
+  assert.ok(html.includes("<blockquote expandable>🤖 Context &amp; delegation:\nI will delegate to research.</blockquote>"));
+  assert.ok(html.includes("Final answer."));
+});
+
+test("preserves preformatted HTML expandable blockquotes and chunking", () => {
+  const input = "<blockquote expandable>Expandable content</blockquote>\n\nOther text";
+  const html = formatTelegramHtml(input);
+  assert.ok(html.includes("<blockquote expandable>Expandable content</blockquote>"));
+
+  const chunks = formatTelegramHtmlChunks("<blockquote expandable>" + "a".repeat(500) + "</blockquote>", 200);
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    assert.ok(chunk.startsWith("<blockquote expandable>"));
+    assert.ok(chunk.endsWith("</blockquote>"));
+  }
+});
+
 test("formats interactive checkboxes and hierarchical nested lists", () => {
   const markdown = "- [ ] Pending task\n- [x] Completed task\n- Top level bullet\n  - Sub bullet level 2\n    - Deep bullet level 3";
   const html = formatTelegramHtml(markdown);

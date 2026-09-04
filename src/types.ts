@@ -165,6 +165,7 @@ export interface StreamEvent extends Record<string, unknown> {
 
 export interface AgyResult {
   text: string;
+  intermediateText?: string | null;
   parsed: StreamEvent | Record<string, unknown> | null;
   events: StreamEvent[];
   conversationId: string | null;

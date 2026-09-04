@@ -332,7 +332,20 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const responsePrefix = (context.config.telegram.progressMode === "delete" && isCustomWorkspace)
       ? `📁 <b>Workspace:</b> <code>${escapeHtml(settings.workspace!)}</code>\n\n`
       : "";
-    const responseBody = responsePrefix ? `${responsePrefix}${result.text}` : result.text;
+
+    const verbose = settings.verbose || "detailed";
+    let formattedText = result.text;
+    const intermediate = result.intermediateText?.trim();
+
+    if (intermediate && verbose === "detailed") {
+      const quoteBlock = intermediate
+        .split(/\r?\n/)
+        .map((l) => (l.trim() ? `**> ${l}` : "**>"))
+        .join("\n");
+      formattedText = `**> 🤖 Context & delegation:**\n${quoteBlock}\n\n${result.text}`;
+    }
+
+    const responseBody = responsePrefix ? `${responsePrefix}${formattedText}` : formattedText;
 
     if (responseBody.length > context.config.telegram.maxMessageChars * 2) await context.telegram.sendDocument(job.chatId, `agy-${job.id}.md`, responseBody);
     else await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));

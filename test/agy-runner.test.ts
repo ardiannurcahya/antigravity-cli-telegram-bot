@@ -131,3 +131,37 @@ test("attaches media file reference and directory in buildArgs", () => {
   assert.ok(args.includes("--add-dir"));
   assert.ok(args.includes("/tmp/uploads"));
 });
+
+test("isolates intermediate delegation preamble from final answer in parseStreamOutput", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-sub", init: { model: "gemini-3.8-flash" } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "I will delegate this task to research subagent." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "subagent", subagent_info: { name: "research", role: "Codebase Researcher" } } }),
+    JSON.stringify({ event: "step_update", step_update: { text_delta: "Here is the definitive answer." } }),
+    JSON.stringify({ event: "result", result: { conversation_id: "conv-sub", status: "SUCCESS", response: "I will delegate this task to research subagent.\n\nHere is the definitive answer." } }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.intermediateText, "I will delegate this task to research subagent.");
+  assert.equal(parsed.text, "Here is the definitive answer.");
+  assert.equal(parsed.toolCalls, 1);
+});
+
+test("preserves pure single-turn output without intermediateText", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-single", init: { model: "gemini-3.8-flash" } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "Direct answer" } }),
+    JSON.stringify({ event: "result", result: { conversation_id: "conv-single", status: "SUCCESS", response: "Direct answer" } }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.intermediateText, null);
+  assert.equal(parsed.text, "Direct answer");
+  assert.equal(parsed.toolCalls, 0);
+});
+
+test("formats subagent updates with role or name", () => {
+  assert.equal(formatStepUpdate({ subagent_info: { role: "Codebase Researcher" } }), "🤖 Subagent: Codebase Researcher");
+  assert.equal(formatStepUpdate({ subagent_info: { name: "research" } }), "🤖 Subagent: research");
+  assert.equal(formatStepUpdate({ subagent_info: {} }), "🤖 Delegating to subagent...");
+  assert.equal(formatStepUpdate({ step_type: "subagent" }), "🤖 Delegating to subagent...");
+});
+

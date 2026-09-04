@@ -203,6 +203,9 @@ export function parseStreamOutput(stdout: string): AgyResult {
   let model: string | null = null;
   let response = "";
   let streamedResponse = "";
+  let intermediatePreamble = "";
+  let currentTurnText = "";
+  let hasEncounteredToolCall = false;
   let usage: Usage | null = null;
   let durationMs: number | null = null;
   let numTurns: number | null = null;
@@ -221,10 +224,24 @@ export function parseStreamOutput(stdout: string): AgyResult {
     if (event.event === "init") model ||= stringValue(init?.model) || stringValue(event.model);
     if (event.event === "step_update") {
       model ||= stringValue(event.model) || stringValue(step?.model);
-      if (step?.tool_info || step?.subagent_info || isToolStep(stringValue(step?.step_type))) toolCalls += 1;
+      const isTool = !!(step?.tool_info || step?.subagent_info || isToolStep(stringValue(step?.step_type)));
+      if (isTool) {
+        toolCalls += 1;
+        hasEncounteredToolCall = true;
+        if (currentTurnText.trim()) {
+          intermediatePreamble = intermediatePreamble
+            ? `${intermediatePreamble}\n\n${currentTurnText.trim()}`
+            : currentTurnText.trim();
+          currentTurnText = "";
+        }
+      }
       const stepUsage = normalizeUsage(step?.usage);
       if (stepUsage) usage = stepUsage;
-      streamedResponse += stringValue(step?.text_delta) || stringValue(step?.text) || "";
+      const delta = stringValue(step?.text_delta) || stringValue(step?.text) || "";
+      if (delta) {
+        currentTurnText += delta;
+        streamedResponse += delta;
+      }
       executionError ||= pickError(step);
     }
     if (event.event === "result") {
@@ -239,9 +256,34 @@ export function parseStreamOutput(stdout: string): AgyResult {
     }
     if (!response && event.event !== "step_update") response = pickText(event) || response;
   }
+
+  let finalCleanText = response.trim();
+  const trimmedIntermediate = intermediatePreamble.trim();
+
+  if (hasEncounteredToolCall && trimmedIntermediate) {
+    if (finalCleanText) {
+      if (finalCleanText.startsWith(trimmedIntermediate)) {
+        finalCleanText = finalCleanText.slice(trimmedIntermediate.length).trim();
+      }
+    } else if (currentTurnText.trim()) {
+      finalCleanText = currentTurnText.trim();
+    }
+  }
+
+  const resolvedText = finalCleanText || (hasEncounteredToolCall && currentTurnText.trim()) || streamedResponse.trim() || (executionError ? `AGY could not complete the request.\n\n${executionError}` : "AGY returned no output.");
+
   return {
-    text: response.trim() || streamedResponse.trim() || (executionError ? `AGY could not complete the request.\n\n${executionError}` : "AGY returned no output."), parsed: finalEvent, events,
-    conversationId, model, usage, durationMs, numTurns, toolCalls, status: stringValue(asRecord(finalEvent?.result)?.status),
+    text: resolvedText,
+    intermediateText: hasEncounteredToolCall && trimmedIntermediate && trimmedIntermediate !== resolvedText ? trimmedIntermediate : null,
+    parsed: finalEvent,
+    events,
+    conversationId,
+    model,
+    usage,
+    durationMs,
+    numTurns,
+    toolCalls,
+    status: stringValue(asRecord(finalEvent?.result)?.status),
   };
 }
 
@@ -292,6 +334,9 @@ export function formatStepUpdate(stepUpdate: Record<string, unknown> | undefined
   if (subagent) {
     const role = stringValue(subagent.role) || stringValue(subagent.name) || "";
     return role ? `🤖 Subagent: ${role}` : "🤖 Delegating to subagent...";
+  }
+  if (typeof stepUpdate.step_type === "string" && /subagent|delegate/i.test(stepUpdate.step_type)) {
+    return "🤖 Delegating to subagent...";
   }
   if (stepUpdate.step_type === "agent_response") return "💬 Generating response...";
   if (stepUpdate.step_type === "checkpoint") return "💾 Saving checkpoint...";
@@ -394,8 +439,8 @@ export function runAgy(config: AgyConfig, prompt: string, conversationId: string
 function parseJsonOutput(stdout: string): AgyResult {
   try {
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
-    return { text: pickText(parsed) || JSON.stringify(parsed, null, 2), parsed, events: [], conversationId: extractConversationId(parsed), model: stringValue(parsed.model), usage: normalizeUsage(parsed.usage), durationMs: numberOrNull(parsed.duration_seconds, (value) => value * 1000), numTurns: numberOrNull(parsed.num_turns), toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0, status: stringValue(parsed.status) };
-  } catch { return { text: stdout.trim() || "AGY returned no output.", parsed: null, events: [], conversationId: null, model: null, usage: null, durationMs: null, numTurns: null, toolCalls: 0, status: null }; }
+    return { text: pickText(parsed) || JSON.stringify(parsed, null, 2), intermediateText: null, parsed, events: [], conversationId: extractConversationId(parsed), model: stringValue(parsed.model), usage: normalizeUsage(parsed.usage), durationMs: numberOrNull(parsed.duration_seconds, (value) => value * 1000), numTurns: numberOrNull(parsed.num_turns), toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0, status: stringValue(parsed.status) };
+  } catch { return { text: stdout.trim() || "AGY returned no output.", intermediateText: null, parsed: null, events: [], conversationId: null, model: null, usage: null, durationMs: null, numTurns: null, toolCalls: 0, status: null }; }
 }
 
 function pickText(value: Record<string, unknown> | undefined): string {
@@ -426,4 +471,4 @@ function pickError(value: Record<string, unknown> | undefined): string {
 function asRecord(value: unknown): Record<string, unknown> | undefined { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }
 function stringValue(value: unknown): string | null { return typeof value === "string" && value ? value : null; }
 function numberOrNull(value: unknown, transform: (value: number) => number = (item) => item): number | null { const number = Number(value); return Number.isFinite(number) ? transform(number) : null; }
-function isToolStep(stepType: string | null): boolean { return !!stepType && /tool|command|browser|mcp/i.test(stepType); }
+function isToolStep(stepType: string | null): boolean { return !!stepType && /tool|command|browser|mcp|subagent|delegate/i.test(stepType); }
