@@ -165,3 +165,27 @@ test("formats subagent updates with role or name", () => {
   assert.equal(formatStepUpdate({ step_type: "subagent" }), "🤖 Delegating to subagent...");
 });
 
+test("isolates multi-turn intermediate preambles even when response concatenates with single newlines", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-multi", init: { model: "gemini-3.8-flash" } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "Le sous-agent a été lancé." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "subagent", subagent_info: { name: "research" } } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "agent_response", text_delta: "La vérification est en cours." } }),
+    JSON.stringify({ event: "step_update", step_update: { step_type: "tool", tool_info: { name: "manage_subagents" } } }),
+    JSON.stringify({ event: "step_update", step_update: { text_delta: "Synthèse finale : Node v24.20.0 LTS." } }),
+    JSON.stringify({
+      event: "result",
+      result: {
+        conversation_id: "conv-multi",
+        status: "SUCCESS",
+        response: "Le sous-agent a été lancé.\nLa vérification est en cours.\nSynthèse finale : Node v24.20.0 LTS.",
+      },
+    }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.intermediateText, "Le sous-agent a été lancé.\n\nLa vérification est en cours.");
+  assert.equal(parsed.text, "Synthèse finale : Node v24.20.0 LTS.");
+  assert.equal(parsed.toolCalls, 2);
+});
+
+

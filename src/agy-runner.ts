@@ -203,7 +203,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
   let model: string | null = null;
   let response = "";
   let streamedResponse = "";
-  let intermediatePreamble = "";
+  const intermediateTurns: string[] = [];
   let currentTurnText = "";
   let hasEncounteredToolCall = false;
   let usage: Usage | null = null;
@@ -229,9 +229,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
         toolCalls += 1;
         hasEncounteredToolCall = true;
         if (currentTurnText.trim()) {
-          intermediatePreamble = intermediatePreamble
-            ? `${intermediatePreamble}\n\n${currentTurnText.trim()}`
-            : currentTurnText.trim();
+          intermediateTurns.push(currentTurnText.trim());
           currentTurnText = "";
         }
       }
@@ -258,15 +256,24 @@ export function parseStreamOutput(stdout: string): AgyResult {
   }
 
   let finalCleanText = response.trim();
-  const trimmedIntermediate = intermediatePreamble.trim();
+  const trimmedIntermediate = intermediateTurns.join("\n\n").trim();
 
   if (hasEncounteredToolCall && trimmedIntermediate) {
-    if (finalCleanText) {
-      if (finalCleanText.startsWith(trimmedIntermediate)) {
-        finalCleanText = finalCleanText.slice(trimmedIntermediate.length).trim();
+    let stripped = finalCleanText;
+    for (const turn of intermediateTurns) {
+      const t = turn.trim();
+      if (!t) continue;
+      if (stripped.startsWith(t)) {
+        stripped = stripped.slice(t.length).trimStart();
       }
+    }
+
+    if (stripped && stripped !== finalCleanText) {
+      finalCleanText = stripped;
     } else if (currentTurnText.trim()) {
       finalCleanText = currentTurnText.trim();
+    } else {
+      finalCleanText = stripped;
     }
   }
 
