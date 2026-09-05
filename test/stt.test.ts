@@ -167,12 +167,66 @@ test("STT callbacks update provider and model", async () => {
 
     await handleCallback(ctx, callbackUpdate("set:stt:provider:whisper-local"));
     assert.equal(settingsFor(ctx, 777).sttProvider, "whisper-local");
+    const lastEdited = String(harness.telegram.editedTexts().at(-1));
+    assert.match(lastEdited, /STT provider set to <b>whisper-local<\/b>/);
+    // If whisper is not installed, a warning note is appended
+    assert.match(lastEdited, /⚠️/);
 
     await handleCallback(ctx, callbackUpdate("set:stt:whisper:tiny"));
     assert.equal(settingsFor(ctx, 777).sttWhisperModel, "tiny");
 
     await handleCallback(ctx, callbackUpdate("menu:stt"));
     assert.match(String(harness.telegram.editedTexts().at(-1)), /Select STT option to configure:/);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("handleUpdate notifies user if whisper-local is configured but whisper binary is missing", async () => {
+  const { asAppContext, createHarness } = await import("./helpers/fixtures.js");
+  const { handleUpdate } = await import("../src/router/updates.js");
+  const { saveSettings, settingsFor } = await import("../src/domain/settings.js");
+
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const s = settingsFor(ctx, 777);
+    s.sttProvider = "whisper-local";
+    await saveSettings(ctx, 777, s);
+
+    // Mock voice message update from authorized user (111)
+    const update = {
+      update_id: 12345,
+      message: {
+        message_id: 99,
+        chat: { id: 777, type: "private" },
+        from: { id: 111, is_bot: false, first_name: "Tester" },
+        date: Math.floor(Date.now() / 1000),
+        voice: {
+          file_id: "voice-file-id",
+          duration: 3,
+          mime_type: "audio/ogg",
+        },
+      },
+    };
+
+    // Mock getFile and downloadFile
+    harness.telegram.getFile = async () => ({ file_id: "voice-file-id", file_path: "voice/file.oga" });
+    harness.telegram.downloadFile = async (_filePath: string, dest: string) => {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(dest, Buffer.from("dummy-audio-content"));
+      return dest;
+    };
+
+    await handleUpdate(ctx, update as any);
+
+    const sent = harness.telegram.sentTexts();
+    const hasWhisperWarning = sent.some((txt) =>
+      txt.includes("Whisper nicht verfügbar") || txt.includes("Whisper nicht gefunden")
+    );
+    assert.equal(hasWhisperWarning, true, "User must receive a warning that whisper is not installed");
   } finally {
     harness.cleanup();
   }

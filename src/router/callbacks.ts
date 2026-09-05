@@ -22,6 +22,7 @@ import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import type { TelegramCallbackQuery } from "../types.js";
+import { isWhisperInstalled } from "../stt/stt-service.js";
 import { authorizedCallback } from "./auth.js";
 import { parseCallbackAction } from "./callback-parser.js";
 
@@ -211,7 +212,11 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     if (value === "whisper-local" || value === "gemini" || value === "agy" || value === "none") {
       settings.sttProvider = value;
       await saveSettings(context, chatId, settings);
-      await context.telegram.editMessageText(chatId, messageId, `🎙️ STT provider set to <b>${value}</b>.`, sttKeyboard(context, chatId), "HTML");
+      let text = `🎙️ STT provider set to <b>${value}</b>.`;
+      if (value === "whisper-local" && !isWhisperInstalled(context.config.stt.whisperBin)) {
+        text += `\n\n⚠️ <i>Hinweis: Das Binary <code>${escapeHtml(context.config.stt.whisperBin || "whisper")}</code> ist im System nicht auffindbar. Bitte Whisper installieren oder Konfiguration prüfen.</i>`;
+      }
+      await context.telegram.editMessageText(chatId, messageId, text, sttKeyboard(context, chatId), "HTML");
       return;
     }
   }

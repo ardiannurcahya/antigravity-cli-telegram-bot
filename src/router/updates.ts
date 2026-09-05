@@ -17,7 +17,8 @@ import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
-import { createSttService } from "../stt/stt-service.js";
+import { createSttService, isWhisperInstalled } from "../stt/stt-service.js";
+import { escapeHtml } from "../telegram.js";
 import type { SessionSettings, TelegramMessage, TelegramUpdate } from "../types.js";
 
 export function sessionKeyForMessage(message: TelegramMessage): string {
@@ -191,20 +192,39 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     let transcribedText = "";
     if (isVoice && mediaPath) {
       const settings = settingsFor(context, sessionKey);
-      const sttService = createSttService(context.config, settings);
-      if (sttService && sttService.isAvailable()) {
-        try {
-          await context.telegram.sendChatAction(sessionKey, "record_voice");
-          const result = await sttService.transcribe(mediaPath);
-          if (result.text) {
-            transcribedText = result.text;
-            const showTranscript = context.config.stt.showTranscript && settings.verbose === "detailed";
-            if (showTranscript) {
-              await replyWithHtml(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);
+      const provider = settings.sttProvider || context.config.stt.provider;
+      const whisperBin = context.config.stt.whisperBin || "whisper";
+
+      if (provider === "whisper-local" && !isWhisperInstalled(whisperBin)) {
+        await replyWithHtml(
+          context,
+          sessionKey,
+          `⚠️ <b>Whisper nicht verfügbar:</b> Das Binary <code>${escapeHtml(whisperBin)}</code> ist auf dem Server nicht installiert oder nicht im PATH.\n\nBitte wechsle den Provider mit <code>/stt provider gemini</code> oder <code>/stt provider agy</code>.`
+        );
+      } else {
+        const sttService = createSttService(context.config, settings);
+        if (sttService && sttService.isAvailable()) {
+          try {
+            await context.telegram.sendChatAction(sessionKey, "record_voice");
+            const result = await sttService.transcribe(mediaPath);
+            if (result.text) {
+              transcribedText = result.text;
+              const showTranscript = context.config.stt.showTranscript && settings.verbose === "detailed";
+              if (showTranscript) {
+                await replyWithHtml(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);
+              }
+            }
+          } catch (sttErr) {
+            console.error("STT transcription error:", (sttErr as Error).message);
+            const errMsg = (sttErr as Error).message;
+            if (provider === "whisper-local" && /ENOENT|not found/i.test(errMsg)) {
+              await replyWithHtml(
+                context,
+                sessionKey,
+                `⚠️ <b>Whisper nicht gefunden:</b> Das Binary <code>${escapeHtml(whisperBin)}</code> konnte nicht ausgeführt werden.`
+              );
             }
           }
-        } catch (sttErr) {
-          console.error("STT transcription error:", (sttErr as Error).message);
         }
       }
     }

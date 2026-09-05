@@ -1,8 +1,22 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AppConfig, SessionSettings } from "../types.js";
 import type { SttService, TranscriptionResult } from "../domain/stt.js";
+
+export function isBinaryAvailable(command: string): boolean {
+  if (!command) return false;
+  try {
+    const res = spawnSync("which", [command], { stdio: "ignore" });
+    return res.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+export function isWhisperInstalled(bin = "whisper"): boolean {
+  return isBinaryAvailable(bin);
+}
 
 export class AgySttService implements SttService {
   constructor(private readonly config: AppConfig) {}
