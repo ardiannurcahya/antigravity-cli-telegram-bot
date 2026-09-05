@@ -197,8 +197,10 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
           const result = await sttService.transcribe(mediaPath);
           if (result.text) {
             transcribedText = result.text;
-            if (context.config.stt.showTranscript) {
-              await reply(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);
+            const settings = settingsFor(context, sessionKey);
+            const showTranscript = context.config.stt.showTranscript && settings.verbose === "detailed";
+            if (showTranscript) {
+              await replyWithHtml(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);
             }
           }
         } catch (sttErr) {
