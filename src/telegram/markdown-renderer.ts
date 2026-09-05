@@ -1,8 +1,23 @@
 export function splitMessage(text: string, maxChars: number): string[] {
   if (text.length <= maxChars) return [text];
-  const chunks: string[] = []; let rest = text;
-  while (rest.length > maxChars) { let cut = rest.lastIndexOf("\n", maxChars); if (cut < Math.floor(maxChars * 0.5)) cut = maxChars; chunks.push(rest.slice(0, cut)); rest = rest.slice(cut).replace(/^\n+/, ""); }
-  if (rest) chunks.push(rest); return chunks;
+  const chunks: string[] = [];
+  let rest = text;
+  while (rest.length > maxChars) {
+    let cut = rest.lastIndexOf("\n", maxChars);
+    if (cut < Math.floor(maxChars * 0.5)) {
+      const spaceCut = rest.lastIndexOf(" ", maxChars);
+      if (spaceCut >= Math.floor(maxChars * 0.5)) {
+        cut = spaceCut;
+      } else {
+        cut = maxChars;
+      }
+    }
+    chunks.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^[\n\r]+/, "");
+    if (cut !== maxChars && rest.startsWith(" ")) rest = rest.slice(1);
+  }
+  if (rest) chunks.push(rest);
+  return chunks;
 }
 
 /** Splits pre-formatted HTML text without re-escaping HTML tags. */
@@ -76,28 +91,62 @@ function renderTelegramBlocks(text: string): string[] {
   const output: string[] = [];
   let codeLines: string[] | null = null;
   let codeLanguage = "";
+  let codeFenceLength = 0;
+  let nestedCodeDepth = 0;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
-    if (fence) {
-      if (codeLines) {
-        const language = codeLanguage ? ` class="language-${escapeHtml(codeLanguage)}"` : "";
-        output.push(`<pre><code${language}>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
-        codeLines = null;
-        codeLanguage = "";
-      } else {
-        if (output.length > 0 && output[output.length - 1] !== "") {
-          output.push("");
-        }
-        codeLines = [];
-        codeLanguage = fence[1] || "";
-      }
-      continue;
-    }
+
     if (codeLines) {
+      const isMarkdownBlock = codeLanguage === "markdown" || codeLanguage === "md";
+      const nestedOpenMatch = line.match(/^\s{0,3}(`{3,})\s*([\w+-]+)\s*$/);
+      if (isMarkdownBlock && nestedOpenMatch) {
+        nestedCodeDepth++;
+        codeLines.push(line);
+        continue;
+      }
+
+      const closeMatch = line.match(/^\s{0,3}(`{3,})\s*$/);
+      if (closeMatch) {
+        if (nestedCodeDepth > 0 && closeMatch[1].length < codeFenceLength) {
+          nestedCodeDepth--;
+          codeLines.push(line);
+          continue;
+        }
+
+        if (closeMatch[1].length >= codeFenceLength) {
+          if (nestedCodeDepth > 0) {
+            nestedCodeDepth--;
+            codeLines.push(line);
+            continue;
+          }
+
+          const language = codeLanguage ? ` class="language-${escapeHtml(codeLanguage)}"` : "";
+          output.push(`<pre><code${language}>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+          codeLines = null;
+          codeLanguage = "";
+          codeFenceLength = 0;
+          nestedCodeDepth = 0;
+          continue;
+        }
+      }
+
       codeLines.push(line);
       continue;
     }
+
+    const openFence = line.match(/^\s{0,3}(`{3,})\s*([\w+-]*)\s*$/);
+    if (openFence) {
+      if (output.length > 0 && output[output.length - 1] !== "") {
+        output.push("");
+      }
+      codeLines = [];
+      codeFenceLength = openFence[1].length;
+      codeLanguage = openFence[2] || "";
+      nestedCodeDepth = 0;
+      continue;
+    }
+
 
     // Preformatted HTML Blockquote with inner content sanitization
     if (line.match(/^\s*<blockquote(?:\s+expandable)?>/i)) {
@@ -507,8 +556,6 @@ export function cleanLatexMath(expr: string): string {
     if (GREEK_MAP[name]) return GREEK_MAP[name];
     return name;
   });
-
-  res = res.replace(/\{([^{}]+)\}/g, "$1");
 
   return res.trim().replace(/\s{2,}/g, " ");
 }

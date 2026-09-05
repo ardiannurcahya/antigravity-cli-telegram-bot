@@ -3,17 +3,17 @@ import path from "node:path";
 import type { ChatId } from "../types.js";
 
 /**
- * Supprime les fichiers temporaires et images associés à une session Telegram spécifique.
+ * Removes temporary files and images associated with a specific Telegram session.
  */
 export async function cleanupSessionTempFiles(tempDir: string, chatId: ChatId): Promise<void> {
   const sessionDir = path.join(tempDir, `chat_${chatId}`);
   try {
     await fs.rm(sessionDir, { recursive: true, force: true });
   } catch {
-    // Dossier inexistant ignoré
+    // Ignore missing directory
   }
 
-  // Nettoyer également les fichiers résiduels à la racine du tempDir
+  // Also clean residual session files at the root of tempDir
   try {
     const entries = await fs.readdir(tempDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -22,12 +22,12 @@ export async function cleanupSessionTempFiles(tempDir: string, chatId: ChatId): 
       }
     }
   } catch {
-    // Dossier temp inexistant ignoré
+    // Ignore missing temp directory
   }
 }
 
 /**
- * Supprime les fichiers et dossiers temporaires orphelins ou expirés (plus de 24h).
+ * Removes orphaned or expired temporary files and directories (older than 24h).
  */
 export async function cleanupStaleTempFiles(tempDir: string, maxAgeMs = 24 * 60 * 60 * 1000): Promise<void> {
   try {
@@ -46,10 +46,10 @@ export async function cleanupStaleTempFiles(tempDir: string, maxAgeMs = 24 * 60 
           }
         }
       } catch {
-        // Fichier déjà supprimé
+        // File already deleted
       }
     }
   } catch {
-    // Dossier inaccessible ignoré
+    // Ignore inaccessible directory
   }
 }
