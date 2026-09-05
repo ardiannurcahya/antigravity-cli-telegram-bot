@@ -148,6 +148,15 @@ export interface AppConfig {
     autoInterrupt: boolean;
   };
   agy: AgyConfig;
+  stt: {
+    provider: "agy" | "whisper-local" | "none";
+    agyModel: string;
+    whisperModel: string;
+    whisperBin: string;
+    language: string;
+    timeoutMs: number;
+    showTranscript: boolean;
+  };
   queue: { maxSize: number };
   stateFile: string;
   tempDir: string;

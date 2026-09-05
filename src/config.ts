@@ -49,6 +49,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       dbPath,
       projectsRoot,
     },
+    stt: {
+      provider: sttProviderFrom(env),
+      agyModel: (env.STT_AGY_MODEL || "gemini-3.8-flash-low").trim(),
+      whisperModel: (env.STT_WHISPER_MODEL || "base").trim(),
+      whisperBin: (env.STT_WHISPER_BIN || "whisper").trim(),
+      language: (env.STT_LANGUAGE || "auto").trim(),
+      timeoutMs: positiveIntegerFrom(env, "STT_TIMEOUT_MS", 15_000),
+      showTranscript: booleanFrom(env, "TELEGRAM_STT_SHOW_TRANSCRIPT", true),
+    },
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),
     tempDir: (env.TEMP_DIR || "/var/lib/agy-telegram/tmp").trim(), logLevel: (env.LOG_LEVEL || "info").trim(),
@@ -107,5 +116,13 @@ function verboseFrom(env: Record<string, string | undefined>): "silent" | "compa
   if (["compact", "simple", "medium", "normal", "1line"].includes(raw)) return "compact";
   if (["detailed", "verbose", "full", "high", "all", "on"].includes(raw)) return "detailed";
   throw new Error(`TELEGRAM_VERBOSE must be 'silent', 'compact', or 'detailed' (received: ${raw})`);
+}
+
+function sttProviderFrom(env: Record<string, string | undefined>): "agy" | "whisper-local" | "none" {
+  const raw = (env.STT_PROVIDER || env.TELEGRAM_STT_PROVIDER || "none").trim().toLowerCase();
+  if (["agy", "antigravity"].includes(raw)) return "agy";
+  if (["whisper", "whisper-local", "local-whisper"].includes(raw)) return "whisper-local";
+  if (["none", "off", "false", "0", "disabled"].includes(raw)) return "none";
+  throw new Error(`STT_PROVIDER must be 'agy', 'whisper-local', or 'none' (received: ${raw})`);
 }
 

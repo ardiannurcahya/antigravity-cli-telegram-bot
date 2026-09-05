@@ -17,6 +17,7 @@ import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
+import { createSttService } from "../stt/stt-service.js";
 import type { SessionSettings, TelegramMessage, TelegramUpdate } from "../types.js";
 
 export function sessionKeyForMessage(message: TelegramMessage): string {
@@ -187,9 +188,28 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       extraContext = `[Contact shared: ${fullName} (${c.phone_number})${vcardInfo}]`;
     }
 
-    const rawText = (message.text || message.caption || "").trim();
+    let transcribedText = "";
+    if (isVoice && mediaPath && context.config.stt.provider !== "none") {
+      const sttService = createSttService(context.config);
+      if (sttService && sttService.isAvailable()) {
+        try {
+          await context.telegram.sendChatAction(sessionKey, "record_voice");
+          const result = await sttService.transcribe(mediaPath);
+          if (result.text) {
+            transcribedText = result.text;
+            if (context.config.stt.showTranscript) {
+              await reply(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);
+            }
+          }
+        } catch (sttErr) {
+          console.error("STT transcription error:", (sttErr as Error).message);
+        }
+      }
+    }
+
+    const rawText = (transcribedText || message.text || message.caption || "").trim();
     let promptPrefix = "";
-    if (attachmentMeta && mediaPath) {
+    if (attachmentMeta && mediaPath && !transcribedText) {
       promptPrefix = attachmentMeta.replace("%PATH%", mediaPath);
     }
     if (extraContext) {
