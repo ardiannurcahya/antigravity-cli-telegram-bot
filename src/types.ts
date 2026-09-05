@@ -64,6 +64,7 @@ export interface SessionSettings {
   sttProvider?: "agy" | "whisper-local" | "gemini" | "none";
   sttWhisperModel?: string;
   sttAgyModel?: string;
+  sttGeminiModel?: string;
   sttLang?: string;
   ttsMode?: "off" | "voice-only" | "voice-and-text" | "auto";
   ttsVoice?: string;

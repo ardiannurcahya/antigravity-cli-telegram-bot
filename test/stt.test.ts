@@ -88,6 +88,12 @@ test("/stt command shows status and updates session settings", async () => {
     await handleCommand(ctx, msg, "/stt", ["model", "small"]);
     assert.equal(settingsFor(ctx, 777).sttWhisperModel, "small");
 
+    await handleCommand(ctx, msg, "/stt", ["provider", "gemini"]);
+    assert.equal(settingsFor(ctx, 777).sttProvider, "gemini");
+
+    await handleCommand(ctx, msg, "/stt", ["model", "gemini-1.5-pro"]);
+    assert.equal(settingsFor(ctx, 777).sttGeminiModel, "gemini-1.5-pro");
+
     await handleCommand(ctx, msg, "/stt", ["lang", "en"]);
     assert.equal(settingsFor(ctx, 777).sttLang, "en");
   } finally {
@@ -95,7 +101,7 @@ test("/stt command shows status and updates session settings", async () => {
   }
 });
 
-test("createSttService creates GeminiSttService when provider is 'gemini'", () => {
+test("createSttService creates GeminiSttService with custom geminiModel when provider is 'gemini'", () => {
   const config = mockConfig({
     stt: {
       ...mockConfig().stt,
@@ -104,9 +110,10 @@ test("createSttService creates GeminiSttService when provider is 'gemini'", () =
       geminiModel: "gemini-2.5-flash",
     },
   });
-  const service = createSttService(config);
+  const service = createSttService(config, { sttGeminiModel: "gemini-1.5-pro" } as any);
   assert.ok(service instanceof GeminiSttService);
   assert.equal(service.isAvailable(), true);
+  assert.equal((service as any).config.stt.geminiModel, "gemini-1.5-pro");
 });
 
 test("sttKeyboard only includes Whisper model button when provider is whisper-local", async () => {

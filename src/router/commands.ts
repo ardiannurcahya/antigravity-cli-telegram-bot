@@ -347,12 +347,14 @@ command("/stt")(async ({ context, chatId, args }) => {
     const provider = currentSettings.sttProvider || context.config.stt?.provider || "none";
     const whisperModel = currentSettings.sttWhisperModel || context.config.stt?.whisperModel || "base";
     const agyModel = currentSettings.sttAgyModel || context.config.stt?.agyModel || "gemini-3.8-flash-low";
+    const geminiModel = currentSettings.sttGeminiModel || context.config.stt?.geminiModel || "gemini-2.5-flash";
     const lang = currentSettings.sttLang || context.config.stt?.language || "de";
     const text = [
       "🎙️ <b>Speech-to-Text (STT) Settings:</b>\n",
       `• <b>Provider:</b> <code>${escapeHtml(provider)}</code>`,
       `• <b>Whisper Model:</b> <code>${escapeHtml(whisperModel)}</code>`,
       `• <b>AGY Model:</b> <code>${escapeHtml(agyModel)}</code>`,
+      `• <b>Gemini Model:</b> <code>${escapeHtml(geminiModel)}</code>`,
       `• <b>Language:</b> <code>${escapeHtml(lang)}</code>\n`,
       "<b>Usage:</b>",
       "• <code>/stt provider &lt;whisper-local|gemini|agy|none&gt;</code>",
@@ -390,13 +392,17 @@ command("/stt")(async ({ context, chatId, args }) => {
   if (sub === "model") {
     const val = args[1]?.trim();
     if (!val) {
-      await reply(context, chatId, "Please specify a model name. E.g. <code>/stt model base</code> or <code>/stt model gemini-3.8-flash-low</code>.", sttKeyboard(context, chatId));
+      await reply(context, chatId, "Please specify a model name. E.g. <code>/stt model base</code> or <code>/stt model gemini-2.5-flash</code>.", sttKeyboard(context, chatId));
       return;
     }
     if (currentSettings.sttProvider === "whisper-local") {
       currentSettings.sttWhisperModel = val;
       await saveSettings(context, chatId, currentSettings);
       await replyWithHtml(context, chatId, `🧠 Whisper STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    } else if (currentSettings.sttProvider === "gemini") {
+      currentSettings.sttGeminiModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `✨ Gemini STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
     } else {
       currentSettings.sttAgyModel = val;
       await saveSettings(context, chatId, currentSettings);

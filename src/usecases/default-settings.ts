@@ -29,6 +29,7 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       ...(settings.sttProvider ? { STT_PROVIDER: settings.sttProvider } : {}),
       ...(settings.sttWhisperModel ? { STT_WHISPER_MODEL: settings.sttWhisperModel } : {}),
       ...(settings.sttAgyModel ? { STT_AGY_MODEL: settings.sttAgyModel } : {}),
+      ...(settings.sttGeminiModel ? { STT_GEMINI_MODEL: settings.sttGeminiModel } : {}),
       ...(settings.sttLang ? { STT_LANGUAGE: settings.sttLang } : {}),
       ...(settings.ttsMode ? { TTS_MODE: settings.ttsMode } : {}),
       ...(settings.ttsVoice ? { TTS_VOICE: settings.ttsVoice } : {}),
@@ -55,6 +56,7 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       if (settings.sttProvider) context.config.stt.provider = settings.sttProvider;
       if (settings.sttWhisperModel) context.config.stt.whisperModel = settings.sttWhisperModel;
       if (settings.sttAgyModel) context.config.stt.agyModel = settings.sttAgyModel;
+      if (settings.sttGeminiModel) context.config.stt.geminiModel = settings.sttGeminiModel;
       if (settings.sttLang) context.config.stt.language = settings.sttLang;
     }
     if (context.config.tts) {

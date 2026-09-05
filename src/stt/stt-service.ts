@@ -148,6 +148,7 @@ export class GeminiSttService implements SttService {
     }
 
     const model = this.config.stt.geminiModel || "gemini-2.5-flash";
+    const language = options?.language || this.config.stt.language;
     const audioBuffer = await fs.readFile(audioFilePath);
     const base64Audio = audioBuffer.toString("base64");
 
@@ -159,7 +160,9 @@ export class GeminiSttService implements SttService {
     else if (ext === ".aac") mimeType = "audio/aac";
     else if (ext === ".flac") mimeType = "audio/flac";
 
-    const prompt = "Transcribe the spoken language from this audio. Output ONLY the exact transcribed text, without any introduction, confirmation, explanation, formatting, or quotation marks. If no speech is audible or the audio is empty, reply with [EMPTY].";
+    const prompt = language && language !== "auto"
+      ? `Transcribe the spoken language from this audio in ${language}. Output ONLY the exact transcribed text, without any introduction, confirmation, explanation, formatting, or quotation marks. If no speech is audible or the audio is empty, reply with [EMPTY].`
+      : "Transcribe the spoken language from this audio. Output ONLY the exact transcribed text, without any introduction, confirmation, explanation, formatting, or quotation marks. If no speech is audible or the audio is empty, reply with [EMPTY].";
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
@@ -232,6 +235,7 @@ export function createSttService(config: AppConfig, settings?: SessionSettings):
       provider,
       whisperModel: settings?.sttWhisperModel || config.stt.whisperModel,
       agyModel: settings?.sttAgyModel || config.stt.agyModel,
+      geminiModel: settings?.sttGeminiModel || config.stt.geminiModel,
       language: settings?.sttLang || config.stt.language,
     },
   };

@@ -373,9 +373,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
             voice: settings.ttsVoice || context.config.tts?.voice,
             signal: controller.signal,
           });
-          const markup = shouldSendText ? undefined : createMainKeyboard(settingsFor(context, job.chatId));
-          await context.telegram.sendVoice(job.chatId, synth.audioPath, undefined, markup);
-          await fs.unlink(synth.audioPath).catch(() => undefined);
+          try {
+            const markup = shouldSendText ? undefined : createMainKeyboard(settingsFor(context, job.chatId));
+            await context.telegram.sendVoice(job.chatId, synth.audioPath, undefined, markup);
+          } finally {
+            await fs.unlink(synth.audioPath).catch(() => undefined);
+          }
         } catch (ttsErr) {
           console.error("[TTS] Synthesis or delivery failed:", (ttsErr as Error).message);
           if (!shouldSendText) {
