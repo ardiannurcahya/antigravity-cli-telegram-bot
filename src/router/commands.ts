@@ -11,6 +11,8 @@ import {
   modelKeyboard,
   outputFormatKeyboard,
   sandboxKeyboard,
+  sttKeyboard,
+  ttsKeyboard,
   verboseKeyboard,
   workspaceKeyboard,
 } from "../ui/inline-keyboards.js";
@@ -21,6 +23,7 @@ import { enqueueJob } from "../usecases/enqueue.js";
 import { refreshModels, selectModel } from "../usecases/model-selection.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
+import { isWhisperInstalled } from "../stt/stt-service.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
 import { resolveWorkspacePath } from "../domain/workspace.js";
@@ -336,6 +339,141 @@ command("/workspace")(async ({ context, chatId, args }) => {
     `📁 <b>Workspace switched</b>\n\nActive project: <code>${escapeHtml(resolution.resolvedPath)}</code>\n\nA new clean session has been started in this workspace.`,
     createMainKeyboard(settingsFor(context, chatId))
   );
+});
+
+command("/stt")(async ({ context, chatId, args }) => {
+  const currentSettings = settingsFor(context, chatId);
+  if (!args[0]) {
+    const provider = currentSettings.sttProvider || context.config.stt?.provider || "none";
+    const whisperModel = currentSettings.sttWhisperModel || context.config.stt?.whisperModel || "base";
+    const agyModel = currentSettings.sttAgyModel || context.config.stt?.agyModel || "gemini-3.8-flash-low";
+    const geminiModel = currentSettings.sttGeminiModel || context.config.stt?.geminiModel || "gemini-2.5-flash";
+    const lang = currentSettings.sttLang || context.config.stt?.language || "de";
+    const text = [
+      "🎙️ <b>Speech-to-Text (STT) Settings:</b>\n",
+      `• <b>Provider:</b> <code>${escapeHtml(provider)}</code>`,
+      `• <b>Whisper Model:</b> <code>${escapeHtml(whisperModel)}</code>`,
+      `• <b>AGY Model:</b> <code>${escapeHtml(agyModel)}</code>`,
+      `• <b>Gemini Model:</b> <code>${escapeHtml(geminiModel)}</code>`,
+      `• <b>Language:</b> <code>${escapeHtml(lang)}</code>\n`,
+      "<b>Usage:</b>",
+      "• <code>/stt provider &lt;whisper-local|gemini|agy|none&gt;</code>",
+      "• <code>/stt model &lt;model-name&gt;</code>",
+      "• <code>/stt lang &lt;de|en|auto|...&gt;</code>",
+    ].join("\n");
+    await replyWithHtml(context, chatId, text, sttKeyboard(context, chatId));
+    return;
+  }
+
+  const sub = args[0].toLowerCase().trim();
+  if (sub === "provider") {
+    const val = args[1]?.toLowerCase().trim();
+    if (val === "whisper" || val === "whisper-local") {
+      currentSettings.sttProvider = "whisper-local";
+    } else if (val === "gemini" || val === "gemini-api" || val === "google") {
+      currentSettings.sttProvider = "gemini";
+    } else if (val === "agy" || val === "antigravity") {
+      currentSettings.sttProvider = "agy";
+    } else if (val === "none" || val === "off" || val === "disabled") {
+      currentSettings.sttProvider = "none";
+    } else {
+      await reply(context, chatId, "Invalid STT provider. Choose: whisper-local, gemini, agy, none.", sttKeyboard(context, chatId));
+      return;
+    }
+    await saveSettings(context, chatId, currentSettings);
+    let replyMsg = `🎙️ STT provider set to <code>${currentSettings.sttProvider}</code>.`;
+    if (currentSettings.sttProvider === "whisper-local" && !isWhisperInstalled(context.config.stt.whisperBin)) {
+      replyMsg += `\n\n⚠️ <i>Hinweis: Das Binary <code>${escapeHtml(context.config.stt.whisperBin || "whisper")}</code> ist im System nicht auffindbar. Bitte Whisper installieren oder Konfiguration prüfen.</i>`;
+    }
+    await replyWithHtml(context, chatId, replyMsg, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  if (sub === "model") {
+    const val = args[1]?.trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a model name. E.g. <code>/stt model base</code> or <code>/stt model gemini-2.5-flash</code>.", sttKeyboard(context, chatId));
+      return;
+    }
+    if (currentSettings.sttProvider === "whisper-local") {
+      currentSettings.sttWhisperModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🧠 Whisper STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    } else if (currentSettings.sttProvider === "gemini") {
+      currentSettings.sttGeminiModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `✨ Gemini STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    } else {
+      currentSettings.sttAgyModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🤖 AGY STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    }
+    return;
+  }
+
+  if (sub === "lang" || sub === "language") {
+    const val = args[1]?.toLowerCase().trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a language code. E.g. <code>/stt lang de</code> or <code>/stt lang auto</code>.", sttKeyboard(context, chatId));
+      return;
+    }
+    currentSettings.sttLang = val;
+    await saveSettings(context, chatId, currentSettings);
+    await replyWithHtml(context, chatId, `🌐 STT language set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  await reply(context, chatId, "Unknown STT option. Use <code>/stt</code> to view settings and options.", sttKeyboard(context, chatId));
+});
+
+command("/tts")(async ({ context, chatId, args }) => {
+  const currentSettings = settingsFor(context, chatId);
+  if (args.length === 0) {
+    const mode = currentSettings.ttsMode || "off";
+    const voice = currentSettings.ttsVoice || "de-DE-ConradNeural";
+    const text = [
+      "🔊 <b>Text-to-Speech (TTS) Voice Output Settings:</b>\n",
+      `• <b>Mode:</b> <code>${escapeHtml(mode)}</code>`,
+      `• <b>Voice:</b> <code>${escapeHtml(voice)}</code>\n`,
+      "<b>Modes:</b>",
+      "• <code>off</code>: No voice answers",
+      "• <code>auto</code>: Voice answer only when prompt was a voice note",
+      "• <code>voice-only</code>: Voice answer only (no text)",
+      "• <code>voice-and-text</code>: Both voice note and text answer\n",
+      "<b>Usage:</b>",
+      "• <code>/tts mode &lt;off|auto|voice-only|voice-and-text&gt;</code>",
+      "• <code>/tts voice &lt;voice-name&gt;</code>",
+    ].join("\n");
+    await replyWithHtml(context, chatId, text, ttsKeyboard(context, chatId));
+    return;
+  }
+
+  const sub = args[0].toLowerCase().trim();
+  if (sub === "mode") {
+    const val = args[1]?.toLowerCase().trim();
+    if (["off", "voice-only", "voice-and-text", "auto"].includes(val)) {
+      currentSettings.ttsMode = val as any;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🔊 TTS mode set to <code>${val}</code>.`, createMainKeyboard(currentSettings));
+      return;
+    }
+    await reply(context, chatId, "Invalid TTS mode. Choose: off, auto, voice-only, voice-and-text.", ttsKeyboard(context, chatId));
+    return;
+  }
+
+  if (sub === "voice") {
+    const val = args.slice(1).join(" ").trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a voice name. E.g. <code>/tts voice de-DE-ConradNeural</code>.", ttsKeyboard(context, chatId));
+      return;
+    }
+    currentSettings.ttsVoice = val;
+    await saveSettings(context, chatId, currentSettings);
+    await replyWithHtml(context, chatId, `🗣️ TTS voice set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  await reply(context, chatId, "Unknown TTS option. Use <code>/tts</code> to view settings and options.", ttsKeyboard(context, chatId));
 });
 
 command("/new-project", "/disable-slash-commands")(async ({ context, chatId, command, args }) => {

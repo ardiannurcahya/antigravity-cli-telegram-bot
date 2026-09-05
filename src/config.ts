@@ -49,6 +49,23 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       dbPath,
       projectsRoot,
     },
+    stt: {
+      provider: sttProviderFrom(env),
+      agyModel: (env.STT_AGY_MODEL || "gemini-3.8-flash-low").trim(),
+      whisperModel: (env.STT_WHISPER_MODEL || "base").trim(),
+      whisperBin: (env.STT_WHISPER_BIN || "whisper").trim(),
+      geminiApiKey: (env.GEMINI_API_KEY || env.STT_GEMINI_API_KEY || "").trim() || undefined,
+      geminiModel: (env.STT_GEMINI_MODEL || "gemini-2.5-flash").trim(),
+      language: (env.STT_LANGUAGE || "en").trim(),
+      timeoutMs: positiveIntegerFrom(env, "STT_TIMEOUT_MS", 15_000),
+      showTranscript: booleanFrom(env, "TELEGRAM_STT_SHOW_TRANSCRIPT", true),
+    },
+    tts: {
+      mode: ttsModeFrom(env),
+      voice: (env.TTS_VOICE || "en-US-AndrewMultilingualNeural").trim(),
+      bin: (env.TTS_BIN || "/home/ubuntu/.local/bin/edge-tts").trim(),
+      timeoutMs: positiveIntegerFrom(env, "TTS_TIMEOUT_MS", 25_000),
+    },
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),
     tempDir: (env.TEMP_DIR || "/var/lib/agy-telegram/tmp").trim(), logLevel: (env.LOG_LEVEL || "info").trim(),
@@ -59,6 +76,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 export function isMode(value: string): value is "plan" | "accept-edits" { return value === "plan" || value === "accept-edits"; }
 export function isEffort(value: string): value is "low" | "medium" | "high" { return value === "low" || value === "medium" || value === "high"; }
 export function isVerbose(value: string): value is "silent" | "compact" | "detailed" { return value === "silent" || value === "compact" || value === "detailed"; }
+export function isTtsMode(value: string): value is "off" | "voice-only" | "voice-and-text" | "auto" {
+  return value === "off" || value === "voice-only" || value === "voice-and-text" || value === "auto";
+}
 
 function modelsFrom(env: Record<string, string | undefined>): string[] {
   const configured = (env.AGY_ALLOWED_MODELS || "").split(",").map((value) => value.trim()).filter(Boolean);
@@ -107,5 +127,23 @@ function verboseFrom(env: Record<string, string | undefined>): "silent" | "compa
   if (["compact", "simple", "medium", "normal", "1line"].includes(raw)) return "compact";
   if (["detailed", "verbose", "full", "high", "all", "on"].includes(raw)) return "detailed";
   throw new Error(`TELEGRAM_VERBOSE must be 'silent', 'compact', or 'detailed' (received: ${raw})`);
+}
+
+function sttProviderFrom(env: Record<string, string | undefined>): "agy" | "whisper-local" | "gemini" | "none" {
+  const raw = (env.STT_PROVIDER || env.TELEGRAM_STT_PROVIDER || "none").trim().toLowerCase();
+  if (["agy", "antigravity"].includes(raw)) return "agy";
+  if (["whisper", "whisper-local", "local-whisper"].includes(raw)) return "whisper-local";
+  if (["gemini", "gemini-api", "google"].includes(raw)) return "gemini";
+  if (["none", "off", "false", "0", "disabled"].includes(raw)) return "none";
+  throw new Error(`STT_PROVIDER must be 'agy', 'whisper-local', 'gemini', or 'none' (received: ${raw})`);
+}
+
+function ttsModeFrom(env: Record<string, string | undefined>): "off" | "voice-only" | "voice-and-text" | "auto" {
+  const raw = (env.TTS_MODE || env.TELEGRAM_TTS_MODE || "off").trim().toLowerCase();
+  if (["off", "false", "0", "disabled", "none"].includes(raw)) return "off";
+  if (["voice-only", "voice", "audio", "only"].includes(raw)) return "voice-only";
+  if (["voice-and-text", "both", "all", "text-and-voice"].includes(raw)) return "voice-and-text";
+  if (["auto", "smart"].includes(raw)) return "auto";
+  throw new Error(`TTS_MODE must be 'off', 'voice-only', 'voice-and-text', or 'auto' (received: ${raw})`);
 }
 

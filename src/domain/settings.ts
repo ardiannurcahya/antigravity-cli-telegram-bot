@@ -17,6 +17,13 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     newProject: false, disableSlashCommands: false, jsonSchema: null, logFile: null, outputFormat: "stream-json",
     printTimeout: null, verbose: config.telegram.verbose || "detailed",
     workspace: null,
+    sttProvider: config.stt?.provider ?? "none",
+    sttWhisperModel: config.stt?.whisperModel ?? "base",
+    sttAgyModel: config.stt?.agyModel ?? "gemini-3.8-flash-low",
+    sttGeminiModel: config.stt?.geminiModel ?? "gemini-2.5-flash",
+    sttLang: config.stt?.language ?? "en",
+    ttsMode: config.tts?.mode ?? "off",
+    ttsVoice: config.tts?.voice ?? "en-US-AndrewMultilingualNeural",
   };
   const stored = context.state.session(chatId)?.settings || {};
   const settings: SessionSettings = {
@@ -36,6 +43,13 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     printTimeout: typeof stored.printTimeout === "string" && stored.printTimeout.trim() ? stored.printTimeout.trim() : null,
     verbose: typeof stored.verbose === "string" && isVerbose(stored.verbose) ? stored.verbose : defaults.verbose,
     workspace: typeof stored.workspace === "string" && stored.workspace.trim() ? stored.workspace.trim() : defaults.workspace,
+    sttProvider: stored.sttProvider === "agy" || stored.sttProvider === "whisper-local" || stored.sttProvider === "gemini" || stored.sttProvider === "none" ? stored.sttProvider : defaults.sttProvider,
+    sttWhisperModel: typeof stored.sttWhisperModel === "string" && stored.sttWhisperModel.trim() ? stored.sttWhisperModel.trim() : defaults.sttWhisperModel,
+    sttAgyModel: typeof stored.sttAgyModel === "string" && stored.sttAgyModel.trim() ? stored.sttAgyModel.trim() : defaults.sttAgyModel,
+    sttGeminiModel: typeof stored.sttGeminiModel === "string" && stored.sttGeminiModel.trim() ? stored.sttGeminiModel.trim() : defaults.sttGeminiModel,
+    sttLang: typeof stored.sttLang === "string" && stored.sttLang.trim() ? stored.sttLang.trim() : defaults.sttLang,
+    ttsMode: stored.ttsMode === "off" || stored.ttsMode === "voice-only" || stored.ttsMode === "voice-and-text" || stored.ttsMode === "auto" ? stored.ttsMode : defaults.ttsMode,
+    ttsVoice: typeof stored.ttsVoice === "string" && stored.ttsVoice.trim() ? stored.ttsVoice.trim() : defaults.ttsVoice,
   };
   if (config.agy.sandbox && !config.agy.allowSandboxDisable) settings.sandbox = true;
   return settings;

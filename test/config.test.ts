@@ -87,3 +87,9 @@ test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without o
   assert.ok(ids.includes("gpt-oss-120b-medium"));
   assert.equal(ids.length, 14);
 });
+
+test("loads default STT provider as none and TTS mode as off", () => {
+  const config = loadConfig(base);
+  assert.equal(config.stt.provider, "none");
+  assert.equal(config.tts?.mode, "off");
+});

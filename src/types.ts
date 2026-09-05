@@ -61,6 +61,13 @@ export interface SessionSettings {
   printTimeout?: string | null;
   verbose?: "silent" | "compact" | "detailed";
   workspace?: string | null;
+  sttProvider?: "agy" | "whisper-local" | "gemini" | "none";
+  sttWhisperModel?: string;
+  sttAgyModel?: string;
+  sttGeminiModel?: string;
+  sttLang?: string;
+  ttsMode?: "off" | "voice-only" | "voice-and-text" | "auto";
+  ttsVoice?: string;
 }
 
 export interface Usage {
@@ -148,6 +155,23 @@ export interface AppConfig {
     autoInterrupt: boolean;
   };
   agy: AgyConfig;
+  stt: {
+    provider: "agy" | "whisper-local" | "gemini" | "none";
+    agyModel: string;
+    whisperModel: string;
+    whisperBin: string;
+    geminiApiKey?: string;
+    geminiModel?: string;
+    language: string;
+    timeoutMs: number;
+    showTranscript: boolean;
+  };
+  tts?: {
+    mode: "off" | "voice-only" | "voice-and-text" | "auto";
+    voice: string;
+    bin: string;
+    timeoutMs: number;
+  };
   queue: { maxSize: number };
   stateFile: string;
   tempDir: string;

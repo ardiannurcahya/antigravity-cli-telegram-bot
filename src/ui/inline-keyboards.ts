@@ -118,6 +118,7 @@ export function mainInlineKeyboard(): InlineKeyboardMarkup {
       [button("Changelog", "cli:changelog"), button("CLI help", "cli:help")],
       [button("CLI version", "cli:version"), button("Custom /agy", "menu:custom")],
       [button("Plugin actions", "menu:plugins"), button("Update CLI", "cli:update")],
+      [button("🎙️ STT", "menu:stt"), button("🔊 TTS", "menu:tts")],
       [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
       [button("🔄 Update Bot", "action:update_bot"), button("Cancel", "action:cancel")],
     ],
@@ -148,3 +149,121 @@ export function outputFormatKeyboard(context: AppContext, chatId: ChatId): Inlin
     ],
   };
 }
+
+export function sttKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const provider = settings.sttProvider || context.config.stt.provider;
+  const whisperModel = settings.sttWhisperModel || context.config.stt.whisperModel;
+  const lang = settings.sttLang || context.config.stt.language;
+
+  const rows: InlineKeyboardMarkup["inline_keyboard"] = [
+    [button(`🎙️ Provider: ${provider}`, "menu:stt:provider")],
+  ];
+
+  if (provider === "whisper-local") {
+    rows.push([
+      button(`🧠 Whisper: ${whisperModel}`, "menu:stt:whisper"),
+      button(`🌐 Lang: ${lang}`, "menu:stt:lang"),
+    ]);
+  } else if (provider !== "none") {
+    rows.push([button(`🌐 Lang: ${lang}`, "menu:stt:lang")]);
+  }
+
+  rows.push([button("‹ Back", "menu:main")]);
+  return { inline_keyboard: rows };
+}
+
+export function sttProviderKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttProvider || context.config.stt.provider;
+  const choices: Array<"whisper-local" | "gemini" | "agy" | "none"> = [
+    "whisper-local",
+    "gemini",
+    "agy",
+    "none",
+  ];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:stt:provider:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
+}
+
+export function sttWhisperModelKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttWhisperModel || context.config.stt.whisperModel;
+  const choices = ["tiny", "base", "small", "medium"];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:stt:whisper:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
+}
+
+export function sttLangKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttLang || context.config.stt.language || "auto";
+  const choices = [
+    { label: "Auto-detect", id: "auto" },
+    { label: "English", id: "en" },
+    { label: "German", id: "de" },
+    { label: "French", id: "fr" },
+    { label: "Italian", id: "it" },
+    { label: "Spanish", id: "es" },
+  ];
+  const rows = choices.map((choice) => [
+    button(`${choice.id === selected ? "✅ " : ""}${choice.label} (${choice.id})`, `set:stt:lang:${choice.id}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
+}
+
+export function ttsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const mode = settings.ttsMode || context.config.tts?.mode || "off";
+  const voice = settings.ttsVoice || context.config.tts?.voice || "en-US-AndrewMultilingualNeural";
+  const displayVoice = voice.replace(/^(en-US-|en-GB-|de-DE-)/, "").replace("Neural", "");
+
+  return {
+    inline_keyboard: [
+      [button(`🔊 Mode: ${mode}`, "menu:tts:mode")],
+      [button(`🗣️ Voice: ${displayVoice}`, "menu:tts:voice")],
+      [button("‹ Back", "menu:main")],
+    ],
+  };
+}
+
+export function ttsModeKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.ttsMode || context.config.tts?.mode || "off";
+  const choices: Array<"off" | "voice-only" | "voice-and-text" | "auto"> = ["off", "voice-only", "voice-and-text", "auto"];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:tts:mode:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:tts")]);
+  return { inline_keyboard: rows };
+}
+
+export function ttsVoiceKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.ttsVoice || context.config.tts?.voice || "en-US-AndrewMultilingualNeural";
+  const choices = [
+    { label: "Andrew (English - US, Multilingual Male)", id: "en-US-AndrewMultilingualNeural" },
+    { label: "Ava (English - US, Multilingual Female)", id: "en-US-AvaMultilingualNeural" },
+    { label: "Brian (English - US, Multilingual Male)", id: "en-US-BrianMultilingualNeural" },
+    { label: "Emma (English - US, Multilingual Female)", id: "en-US-EmmaMultilingualNeural" },
+    { label: "Sonia (English - UK Female)", id: "en-GB-SoniaNeural" },
+    { label: "Ryan (English - UK Male)", id: "en-GB-RyanNeural" },
+    { label: "Florian (German Multilingual Male)", id: "de-DE-FlorianMultilingualNeural" },
+    { label: "Seraphina (German Multilingual Female)", id: "de-DE-SeraphinaMultilingualNeural" },
+    { label: "Conrad (German Male)", id: "de-DE-ConradNeural" },
+    { label: "Katja (German Female)", id: "de-DE-KatjaNeural" },
+  ];
+  const rows = choices.map((choice) => [
+    button(`${choice.id === selected ? "✅ " : ""}${choice.label}`, `set:tts:voice:${choice.id}`),
+  ]);
+  rows.push([button("‹ Back", "menu:tts")]);
+  return { inline_keyboard: rows };
+}
+
+

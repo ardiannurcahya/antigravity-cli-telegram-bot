@@ -9,6 +9,8 @@ import {
   backKeyboard,
   button,
   cliOptionsKeyboard,
+  sttKeyboard,
+  ttsKeyboard,
   verboseKeyboard,
 } from "../ui/inline-keyboards.js";
 import { cliOutput, CLI_COMMANDS, showCliOption, showMain, showMenu, showResumeMenu, type CliCommand } from "../ui/screens.js";
@@ -20,6 +22,7 @@ import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import type { TelegramCallbackQuery } from "../types.js";
+import { isWhisperInstalled } from "../stt/stt-service.js";
 import { authorizedCallback } from "./auth.js";
 import { parseCallbackAction } from "./callback-parser.js";
 
@@ -203,6 +206,44 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       "HTML"
     );
     await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
+    return;
+  }
+  if (key === "stt:provider") {
+    if (value === "whisper-local" || value === "gemini" || value === "agy" || value === "none") {
+      settings.sttProvider = value;
+      await saveSettings(context, chatId, settings);
+      let text = `🎙️ STT provider set to <b>${value}</b>.`;
+      if (value === "whisper-local" && !isWhisperInstalled(context.config.stt.whisperBin)) {
+        text += `\n\n⚠️ <i>Hinweis: Das Binary <code>${escapeHtml(context.config.stt.whisperBin || "whisper")}</code> ist im System nicht auffindbar. Bitte Whisper installieren oder Konfiguration prüfen.</i>`;
+      }
+      await context.telegram.editMessageText(chatId, messageId, text, sttKeyboard(context, chatId), "HTML");
+      return;
+    }
+  }
+  if (key === "stt:whisper") {
+    settings.sttWhisperModel = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🧠 Whisper STT model set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
+    return;
+  }
+  if (key === "stt:lang") {
+    settings.sttLang = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🌐 STT language set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
+    return;
+  }
+  if (key === "tts:mode") {
+    if (["off", "voice-only", "voice-and-text", "auto"].includes(value)) {
+      settings.ttsMode = value as any;
+      await saveSettings(context, chatId, settings);
+      await context.telegram.editMessageText(chatId, messageId, `🔊 TTS mode set to <b>${value}</b>.`, ttsKeyboard(context, chatId), "HTML");
+      return;
+    }
+  }
+  if (key === "tts:voice") {
+    settings.ttsVoice = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🗣️ TTS voice set to <b>${escapeHtml(value)}</b>.`, ttsKeyboard(context, chatId), "HTML");
     return;
   }
   await saveSettings(context, chatId, settings);

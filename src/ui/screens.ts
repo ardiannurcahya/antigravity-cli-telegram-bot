@@ -12,6 +12,13 @@ import {
   outputFormatKeyboard,
   resumeKeyboard,
   sandboxKeyboard,
+  sttKeyboard,
+  sttLangKeyboard,
+  sttProviderKeyboard,
+  sttWhisperModelKeyboard,
+  ttsKeyboard,
+  ttsModeKeyboard,
+  ttsVoiceKeyboard,
   verboseKeyboard,
   workspaceKeyboard,
 } from "./inline-keyboards.js";
@@ -113,4 +120,11 @@ export async function showMenu(context: AppContext, chatId: ChatId, messageId: n
   if (kind === "output") return context.telegram.editMessageText(chatId, messageId, "Select the output format used by future normal prompts:", outputFormatKeyboard(context, chatId));
   if (kind === "custom") return context.telegram.editMessageText(chatId, messageId, "Custom AGY command\n\nUse /agy followed by any non-interactive AGY arguments. Example:\n/agy --print \"Explain this project\" --output-format text\n\nInteractive TTY mode is unavailable through Telegram.", backKeyboard());
   if (kind === "plugins") return context.telegram.editMessageText(chatId, messageId, "Plugin commands\n\nRead-only:\n/agy plugin list\n\nMutating commands require /agy-confirm after the bot asks for confirmation:\n/agy plugin install NAME\n/agy plugin uninstall NAME\n/agy plugin enable NAME\n/agy plugin disable NAME\n/agy update", backKeyboard());
+  if (kind === "stt") return context.telegram.editMessageText(chatId, messageId, "Select STT option to configure:", sttKeyboard(context, chatId));
+  if (kind === "stt:provider") return context.telegram.editMessageText(chatId, messageId, "Select STT provider:", sttProviderKeyboard(context, chatId));
+  if (kind === "stt:whisper") return context.telegram.editMessageText(chatId, messageId, "Select Whisper model:", sttWhisperModelKeyboard(context, chatId));
+  if (kind === "stt:lang") return context.telegram.editMessageText(chatId, messageId, "Select STT language:", sttLangKeyboard(context, chatId));
+  if (kind === "tts") return context.telegram.editMessageText(chatId, messageId, "Select TTS option to configure:", ttsKeyboard(context, chatId));
+  if (kind === "tts:mode") return context.telegram.editMessageText(chatId, messageId, "Select TTS response mode:", ttsModeKeyboard(context, chatId));
+  if (kind === "tts:voice") return context.telegram.editMessageText(chatId, messageId, "Select TTS voice:", ttsVoiceKeyboard(context, chatId));
 }

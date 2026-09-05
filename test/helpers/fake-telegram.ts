@@ -107,6 +107,17 @@ export class FakeTelegramClient {
     return {};
   }
 
+  public async sendVoice(chatId: ChatId, voicePath: string | Buffer, caption?: string, replyMarkup?: ReplyMarkup, duration?: number, signal?: AbortSignal): Promise<unknown> {
+    this.recordAndMaybeFail("sendVoice", {
+      chat_id: chatId,
+      voice: typeof voicePath === "string" ? voicePath : `Buffer(${voicePath.length})`,
+      caption,
+      reply_markup: replyMarkup,
+      duration,
+    });
+    return {};
+  }
+
   public getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }> {
     this.recordAndMaybeFail("getFile", { file_id: fileId });
     return Promise.resolve(this.files.get(fileId) || { file_id: fileId });
