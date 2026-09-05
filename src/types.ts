@@ -61,6 +61,10 @@ export interface SessionSettings {
   printTimeout?: string | null;
   verbose?: "silent" | "compact" | "detailed";
   workspace?: string | null;
+  sttProvider?: "agy" | "whisper-local" | "none";
+  sttWhisperModel?: string;
+  sttAgyModel?: string;
+  sttLang?: string;
 }
 
 export interface Usage {

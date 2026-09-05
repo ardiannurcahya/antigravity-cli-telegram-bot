@@ -118,8 +118,9 @@ export function mainInlineKeyboard(): InlineKeyboardMarkup {
       [button("Changelog", "cli:changelog"), button("CLI help", "cli:help")],
       [button("CLI version", "cli:version"), button("Custom /agy", "menu:custom")],
       [button("Plugin actions", "menu:plugins"), button("Update CLI", "cli:update")],
-      [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
-      [button("🔄 Update Bot", "action:update_bot"), button("Cancel", "action:cancel")],
+      [button("🎙️ Voice / STT", "menu:stt"), button("💾 Set as Default", "action:setdefault")],
+      [button("🔄 Update Bot", "action:update_bot"), button("New session", "action:new")],
+      [button("Cancel", "action:cancel")],
     ],
   };
 }
@@ -147,4 +148,44 @@ export function outputFormatKeyboard(context: AppContext, chatId: ChatId): Inlin
       [button("‹ Back", "menu:cli")],
     ],
   };
+}
+
+export function sttKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const provider = settings.sttProvider || context.config.stt.provider;
+  const whisperModel = settings.sttWhisperModel || context.config.stt.whisperModel;
+  const lang = settings.sttLang || context.config.stt.language;
+
+  return {
+    inline_keyboard: [
+      [button(`🎙️ Provider: ${provider}`, "menu:stt:provider")],
+      [
+        button(`🧠 Whisper: ${whisperModel}`, "menu:stt:whisper"),
+        button(`🌐 Lang: ${lang}`, "menu:stt:lang"),
+      ],
+      [button("‹ Back", "menu:main")],
+    ],
+  };
+}
+
+export function sttProviderKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttProvider || context.config.stt.provider;
+  const choices: Array<"whisper-local" | "agy" | "none"> = ["whisper-local", "agy", "none"];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:stt:provider:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
+}
+
+export function sttWhisperModelKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttWhisperModel || context.config.stt.whisperModel;
+  const choices = ["tiny", "base", "small", "medium"];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:stt:whisper:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
 }

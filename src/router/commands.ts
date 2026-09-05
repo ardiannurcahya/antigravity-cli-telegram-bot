@@ -11,6 +11,7 @@ import {
   modelKeyboard,
   outputFormatKeyboard,
   sandboxKeyboard,
+  sttKeyboard,
   verboseKeyboard,
   workspaceKeyboard,
 } from "../ui/inline-keyboards.js";
@@ -336,6 +337,79 @@ command("/workspace")(async ({ context, chatId, args }) => {
     `📁 <b>Workspace switched</b>\n\nActive project: <code>${escapeHtml(resolution.resolvedPath)}</code>\n\nA new clean session has been started in this workspace.`,
     createMainKeyboard(settingsFor(context, chatId))
   );
+});
+
+command("/stt")(async ({ context, chatId, args }) => {
+  const currentSettings = settingsFor(context, chatId);
+  if (!args[0]) {
+    const provider = currentSettings.sttProvider || context.config.stt?.provider || "none";
+    const whisperModel = currentSettings.sttWhisperModel || context.config.stt?.whisperModel || "base";
+    const agyModel = currentSettings.sttAgyModel || context.config.stt?.agyModel || "gemini-3.8-flash-low";
+    const lang = currentSettings.sttLang || context.config.stt?.language || "de";
+    const text = [
+      "🎙️ <b>Speech-to-Text (STT) Settings:</b>\n",
+      `• <b>Provider:</b> <code>${escapeHtml(provider)}</code>`,
+      `• <b>Whisper Model:</b> <code>${escapeHtml(whisperModel)}</code>`,
+      `• <b>AGY Model:</b> <code>${escapeHtml(agyModel)}</code>`,
+      `• <b>Language:</b> <code>${escapeHtml(lang)}</code>\n`,
+      "<b>Usage:</b>",
+      "• <code>/stt provider &lt;whisper-local|agy|none&gt;</code>",
+      "• <code>/stt model &lt;model-name&gt;</code>",
+      "• <code>/stt lang &lt;de|en|auto|...&gt;</code>",
+    ].join("\n");
+    await replyWithHtml(context, chatId, text, sttKeyboard(context, chatId));
+    return;
+  }
+
+  const sub = args[0].toLowerCase().trim();
+  if (sub === "provider") {
+    const val = args[1]?.toLowerCase().trim();
+    if (val === "whisper" || val === "whisper-local") {
+      currentSettings.sttProvider = "whisper-local";
+    } else if (val === "agy" || val === "gemini") {
+      currentSettings.sttProvider = "agy";
+    } else if (val === "none" || val === "off" || val === "disabled") {
+      currentSettings.sttProvider = "none";
+    } else {
+      await reply(context, chatId, "Invalid STT provider. Choose: whisper-local, agy, none.", sttKeyboard(context, chatId));
+      return;
+    }
+    await saveSettings(context, chatId, currentSettings);
+    await replyWithHtml(context, chatId, `🎙️ STT provider set to <code>${currentSettings.sttProvider}</code>.`, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  if (sub === "model") {
+    const val = args[1]?.trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a model name. E.g. <code>/stt model base</code> or <code>/stt model gemini-3.8-flash-low</code>.", sttKeyboard(context, chatId));
+      return;
+    }
+    if (currentSettings.sttProvider === "whisper-local") {
+      currentSettings.sttWhisperModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🧠 Whisper STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    } else {
+      currentSettings.sttAgyModel = val;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🤖 AGY STT model set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    }
+    return;
+  }
+
+  if (sub === "lang" || sub === "language") {
+    const val = args[1]?.toLowerCase().trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a language code. E.g. <code>/stt lang de</code> or <code>/stt lang auto</code>.", sttKeyboard(context, chatId));
+      return;
+    }
+    currentSettings.sttLang = val;
+    await saveSettings(context, chatId, currentSettings);
+    await replyWithHtml(context, chatId, `🌐 STT language set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  await reply(context, chatId, "Unknown STT option. Use <code>/stt</code> to view settings and options.", sttKeyboard(context, chatId));
 });
 
 command("/new-project", "/disable-slash-commands")(async ({ context, chatId, command, args }) => {

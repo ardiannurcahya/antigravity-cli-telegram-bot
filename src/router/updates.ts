@@ -189,15 +189,15 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     }
 
     let transcribedText = "";
-    if (isVoice && mediaPath && context.config.stt.provider !== "none") {
-      const sttService = createSttService(context.config);
+    if (isVoice && mediaPath) {
+      const settings = settingsFor(context, sessionKey);
+      const sttService = createSttService(context.config, settings);
       if (sttService && sttService.isAvailable()) {
         try {
           await context.telegram.sendChatAction(sessionKey, "record_voice");
           const result = await sttService.transcribe(mediaPath);
           if (result.text) {
             transcribedText = result.text;
-            const settings = settingsFor(context, sessionKey);
             const showTranscript = context.config.stt.showTranscript && settings.verbose === "detailed";
             if (showTranscript) {
               await replyWithHtml(context, sessionKey, `🎙️ <i>«${result.text}»</i>`);

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AppConfig } from "../types.js";
+import type { AppConfig, SessionSettings } from "../types.js";
 import type { SttService, TranscriptionResult } from "../domain/stt.js";
 
 export class AgySttService implements SttService {
@@ -116,12 +116,24 @@ export class WhisperLocalSttService implements SttService {
   }
 }
 
-export function createSttService(config: AppConfig): SttService | null {
-  if (config.stt.provider === "agy") {
-    return new AgySttService(config);
+export function createSttService(config: AppConfig, settings?: SessionSettings): SttService | null {
+  const provider = settings?.sttProvider || config.stt.provider;
+  const effectiveConfig: AppConfig = {
+    ...config,
+    stt: {
+      ...config.stt,
+      provider,
+      whisperModel: settings?.sttWhisperModel || config.stt.whisperModel,
+      agyModel: settings?.sttAgyModel || config.stt.agyModel,
+      language: settings?.sttLang || config.stt.language,
+    },
+  };
+
+  if (provider === "agy") {
+    return new AgySttService(effectiveConfig);
   }
-  if (config.stt.provider === "whisper-local") {
-    return new WhisperLocalSttService(config);
+  if (provider === "whisper-local") {
+    return new WhisperLocalSttService(effectiveConfig);
   }
   return null;
 }

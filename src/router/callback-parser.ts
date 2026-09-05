@@ -44,7 +44,9 @@ export function parseCallbackAction(data: string): CallbackAction | null {
   if (data.startsWith("cli:")) return { kind: "cli", command: data.slice("cli:".length) };
   if (data.startsWith("toggle:")) return { kind: "toggle", option: data.slice("toggle:".length) };
   if (data.startsWith("set:")) {
-    const [, key, value] = data.split(":");
+    const parts = data.slice("set:".length).split(":");
+    const value = parts.pop() ?? "";
+    const key = parts.join(":");
     return { kind: "set", key, value };
   }
   return null;

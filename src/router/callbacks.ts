@@ -9,6 +9,7 @@ import {
   backKeyboard,
   button,
   cliOptionsKeyboard,
+  sttKeyboard,
   verboseKeyboard,
 } from "../ui/inline-keyboards.js";
 import { cliOutput, CLI_COMMANDS, showCliOption, showMain, showMenu, showResumeMenu, type CliCommand } from "../ui/screens.js";
@@ -203,6 +204,20 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       "HTML"
     );
     await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
+    return;
+  }
+  if (key === "stt:provider") {
+    if (value === "whisper-local" || value === "agy" || value === "none") {
+      settings.sttProvider = value;
+      await saveSettings(context, chatId, settings);
+      await context.telegram.editMessageText(chatId, messageId, `🎙️ STT provider set to <b>${value}</b>.`, sttKeyboard(context, chatId), "HTML");
+      return;
+    }
+  }
+  if (key === "stt:whisper") {
+    settings.sttWhisperModel = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🧠 Whisper STT model set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
     return;
   }
   await saveSettings(context, chatId, settings);
