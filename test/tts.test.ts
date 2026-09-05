@@ -71,7 +71,7 @@ Das ist **wichtig** und _kursiv_, außerdem \`inline code\`.
 
   const cleaned = cleanTextForSpeech(input);
   assert.ok(!cleaned.includes("console.log"));
-  assert.ok(cleaned.includes("[Codeblock mit 2 Zeilen]"));
+  assert.ok(cleaned.includes("[Code block with 2 lines]"));
   assert.ok(cleaned.includes("meine Website"));
   assert.ok(!cleaned.includes("https://example.com"));
   assert.ok(cleaned.includes("wichtig und kursiv"));

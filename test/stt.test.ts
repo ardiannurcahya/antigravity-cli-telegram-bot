@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AgySttService, WhisperLocalSttService, createSttService } from "../src/stt/stt-service.js";
+import { AgySttService, GeminiSttService, WhisperLocalSttService, createSttService } from "../src/stt/stt-service.js";
 import type { AppConfig } from "../src/types.js";
 
 function mockConfig(overrides?: Partial<AppConfig>): AppConfig {
@@ -95,6 +95,65 @@ test("/stt command shows status and updates session settings", async () => {
   }
 });
 
+test("createSttService creates GeminiSttService when provider is 'gemini'", () => {
+  const config = mockConfig({
+    stt: {
+      ...mockConfig().stt,
+      provider: "gemini",
+      geminiApiKey: "fake-key",
+      geminiModel: "gemini-2.5-flash",
+    },
+  });
+  const service = createSttService(config);
+  assert.ok(service instanceof GeminiSttService);
+  assert.equal(service.isAvailable(), true);
+});
+
+test("sttKeyboard only includes Whisper model button when provider is whisper-local", async () => {
+  const { asAppContext, createHarness } = await import("./helpers/fixtures.js");
+  const { sttKeyboard } = await import("../src/ui/inline-keyboards.js");
+  const { saveSettings, settingsFor } = await import("../src/domain/settings.js");
+
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const s1 = settingsFor(ctx, 777);
+    s1.sttProvider = "whisper-local";
+    await saveSettings(ctx, 777, s1);
+    const kbWhisper = sttKeyboard(ctx, 777);
+    const hasWhisperButton = kbWhisper.inline_keyboard.some((row) =>
+      row.some((btn) => btn.callback_data === "menu:stt:whisper")
+    );
+    assert.equal(hasWhisperButton, true);
+
+    const s2 = settingsFor(ctx, 777);
+    s2.sttProvider = "gemini";
+    await saveSettings(ctx, 777, s2);
+    const kbGemini = sttKeyboard(ctx, 777);
+    const hasWhisperButtonGemini = kbGemini.inline_keyboard.some((row) =>
+      row.some((btn) => btn.callback_data === "menu:stt:whisper")
+    );
+    assert.equal(hasWhisperButtonGemini, false);
+
+    const s3 = settingsFor(ctx, 777);
+    s3.sttProvider = "agy";
+    await saveSettings(ctx, 777, s3);
+    const kbAgy = sttKeyboard(ctx, 777);
+    const hasWhisperButtonAgy = kbAgy.inline_keyboard.some((row) =>
+      row.some((btn) => btn.callback_data === "menu:stt:whisper")
+    );
+    assert.equal(hasWhisperButtonAgy, false);
+
+    const s4 = settingsFor(ctx, 777);
+    s4.sttProvider = "none";
+    await saveSettings(ctx, 777, s4);
+    const kbNone = sttKeyboard(ctx, 777);
+    assert.equal(kbNone.inline_keyboard.length, 2); // Provider + Back
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test("STT callbacks update provider and model", async () => {
   const { asAppContext, callbackUpdate, createHarness } = await import("./helpers/fixtures.js");
   const { handleCallback } = await import("../src/router/callbacks.js");
@@ -103,6 +162,9 @@ test("STT callbacks update provider and model", async () => {
   const harness = createHarness();
   const ctx = asAppContext(harness);
   try {
+    await handleCallback(ctx, callbackUpdate("set:stt:provider:gemini"));
+    assert.equal(settingsFor(ctx, 777).sttProvider, "gemini");
+
     await handleCallback(ctx, callbackUpdate("set:stt:provider:whisper-local"));
     assert.equal(settingsFor(ctx, 777).sttProvider, "whisper-local");
 

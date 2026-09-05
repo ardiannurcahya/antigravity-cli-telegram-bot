@@ -61,7 +61,7 @@ export interface SessionSettings {
   printTimeout?: string | null;
   verbose?: "silent" | "compact" | "detailed";
   workspace?: string | null;
-  sttProvider?: "agy" | "whisper-local" | "none";
+  sttProvider?: "agy" | "whisper-local" | "gemini" | "none";
   sttWhisperModel?: string;
   sttAgyModel?: string;
   sttLang?: string;
@@ -155,10 +155,12 @@ export interface AppConfig {
   };
   agy: AgyConfig;
   stt: {
-    provider: "agy" | "whisper-local" | "none";
+    provider: "agy" | "whisper-local" | "gemini" | "none";
     agyModel: string;
     whisperModel: string;
     whisperBin: string;
+    geminiApiKey?: string;
+    geminiModel?: string;
     language: string;
     timeoutMs: number;
     showTranscript: boolean;

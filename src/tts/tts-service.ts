@@ -11,7 +11,7 @@ export function cleanTextForSpeech(text: string): string {
   // Replace code blocks ```lang ... ``` with a spoken indicator
   cleaned = cleaned.replace(/```(?:[a-zA-Z0-9_-]+)?\s*[\r\n]+([\s\S]*?)```/g, (_match, code) => {
     const lineCount = code.trim().split("\n").length;
-    return `[Codeblock mit ${lineCount} Zeilen]`;
+    return `[Code block with ${lineCount} lines]`;
   });
 
   // Remove inline code backticks `code` -> code
@@ -41,7 +41,7 @@ export function cleanTextForSpeech(text: string): string {
 export class EdgeTtsService implements TtsService {
   constructor(
     private readonly binPath: string = "/home/ubuntu/.local/bin/edge-tts",
-    private readonly defaultVoice: string = "de-DE-ConradNeural",
+    private readonly defaultVoice: string = "en-US-AndrewMultilingualNeural",
     private readonly tempDir: string = os.tmpdir(),
     private readonly timeoutMs: number = 25000
   ) {}
@@ -101,7 +101,7 @@ export function createTtsService(config: AppConfig, settings?: SessionSettings):
   const mode = settings?.ttsMode || config.tts?.mode || "off";
   if (mode === "off") return null;
 
-  const voice = settings?.ttsVoice || config.tts?.voice || "de-DE-ConradNeural";
+  const voice = settings?.ttsVoice || config.tts?.voice || "en-US-AndrewMultilingualNeural";
   const bin = config.tts?.bin || "/home/ubuntu/.local/bin/edge-tts";
   const timeoutMs = config.tts?.timeoutMs || 25000;
   return new EdgeTtsService(bin, voice, config.tempDir, timeoutMs);

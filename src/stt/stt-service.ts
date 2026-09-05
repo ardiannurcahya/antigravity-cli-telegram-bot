@@ -17,7 +17,7 @@ export class AgySttService implements SttService {
   ): Promise<TranscriptionResult> {
     const startedAt = Date.now();
     const model = this.config.stt.agyModel || "gemini-3.8-flash-low";
-    const prompt = `Transkribiere die gesprochene Sprache aus der Audiodatei "${audioFilePath}". Gib AUSSCHLIESSLICH den transkribierten Wortlaut aus, ohne jede Einleitung, Bestätigung, Erklärung oder Anführungszeichen. Falls keine Sprache zu hören ist oder die Datei leer ist, antworte mit [EMPTY].`;
+    const prompt = `Transcribe the spoken language from the audio file "${audioFilePath}". Output ONLY the exact transcribed text, without any introduction, confirmation, explanation, formatting, or quotation marks. If no speech is audible or the file is empty, reply with [EMPTY].`;
 
     const args = [
       "--print",
@@ -116,6 +116,99 @@ export class WhisperLocalSttService implements SttService {
   }
 }
 
+export class GeminiSttService implements SttService {
+  constructor(private readonly config: AppConfig) {}
+
+  public isAvailable(): boolean {
+    return Boolean(this.config.stt.geminiApiKey);
+  }
+
+  public async transcribe(
+    audioFilePath: string,
+    options?: { language?: string; signal?: AbortSignal }
+  ): Promise<TranscriptionResult> {
+    const startedAt = Date.now();
+    const apiKey = this.config.stt.geminiApiKey;
+    if (!apiKey) {
+      throw new Error("Gemini API key is not configured. Set GEMINI_API_KEY in ~/.config/agy-telegram/.env.");
+    }
+
+    const model = this.config.stt.geminiModel || "gemini-2.5-flash";
+    const audioBuffer = await fs.readFile(audioFilePath);
+    const base64Audio = audioBuffer.toString("base64");
+
+    const ext = path.extname(audioFilePath).toLowerCase();
+    let mimeType = "audio/ogg";
+    if (ext === ".mp3") mimeType = "audio/mp3";
+    else if (ext === ".wav") mimeType = "audio/wav";
+    else if (ext === ".m4a") mimeType = "audio/m4a";
+    else if (ext === ".aac") mimeType = "audio/aac";
+    else if (ext === ".flac") mimeType = "audio/flac";
+
+    const prompt = "Transcribe the spoken language from this audio. Output ONLY the exact transcribed text, without any introduction, confirmation, explanation, formatting, or quotation marks. If no speech is audible or the audio is empty, reply with [EMPTY].";
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.stt.timeoutMs);
+    const onAbort = (): void => controller.abort();
+    if (options?.signal) {
+      options.signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType,
+                    data: base64Audio,
+                  },
+                },
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`Gemini STT API error (${response.status}): ${errorText.slice(0, 300)}`);
+      }
+
+      const data = (await response.json()) as any;
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const cleanText = rawText.trim().replace(/^["']|["']$/g, "").trim();
+
+      if (!cleanText || cleanText === "[EMPTY]" || /keine sprache|no speech/i.test(cleanText)) {
+        return {
+          text: "",
+          durationSeconds: (Date.now() - startedAt) / 1000,
+        };
+      }
+
+      return {
+        text: cleanText,
+        durationSeconds: (Date.now() - startedAt) / 1000,
+      };
+    } finally {
+      clearTimeout(timeout);
+      if (options?.signal) {
+        options.signal.removeEventListener("abort", onAbort);
+      }
+    }
+  }
+}
+
 export function createSttService(config: AppConfig, settings?: SessionSettings): SttService | null {
   const provider = settings?.sttProvider || config.stt.provider;
   const effectiveConfig: AppConfig = {
@@ -134,6 +227,9 @@ export function createSttService(config: AppConfig, settings?: SessionSettings):
   }
   if (provider === "whisper-local") {
     return new WhisperLocalSttService(effectiveConfig);
+  }
+  if (provider === "gemini") {
+    return new GeminiSttService(effectiveConfig);
   }
   return null;
 }

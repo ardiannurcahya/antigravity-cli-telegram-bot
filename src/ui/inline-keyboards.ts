@@ -156,22 +156,32 @@ export function sttKeyboard(context: AppContext, chatId: ChatId): InlineKeyboard
   const whisperModel = settings.sttWhisperModel || context.config.stt.whisperModel;
   const lang = settings.sttLang || context.config.stt.language;
 
-  return {
-    inline_keyboard: [
-      [button(`🎙️ Provider: ${provider}`, "menu:stt:provider")],
-      [
-        button(`🧠 Whisper: ${whisperModel}`, "menu:stt:whisper"),
-        button(`🌐 Lang: ${lang}`, "menu:stt:lang"),
-      ],
-      [button("‹ Back", "menu:main")],
-    ],
-  };
+  const rows: InlineKeyboardMarkup["inline_keyboard"] = [
+    [button(`🎙️ Provider: ${provider}`, "menu:stt:provider")],
+  ];
+
+  if (provider === "whisper-local") {
+    rows.push([
+      button(`🧠 Whisper: ${whisperModel}`, "menu:stt:whisper"),
+      button(`🌐 Lang: ${lang}`, "menu:stt:lang"),
+    ]);
+  } else if (provider !== "none") {
+    rows.push([button(`🌐 Lang: ${lang}`, "menu:stt:lang")]);
+  }
+
+  rows.push([button("‹ Back", "menu:main")]);
+  return { inline_keyboard: rows };
 }
 
 export function sttProviderKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
   const settings = settingsFor(context, chatId);
   const selected = settings.sttProvider || context.config.stt.provider;
-  const choices: Array<"whisper-local" | "agy" | "none"> = ["whisper-local", "agy", "none"];
+  const choices: Array<"whisper-local" | "gemini" | "agy" | "none"> = [
+    "whisper-local",
+    "gemini",
+    "agy",
+    "none",
+  ];
   const rows = choices.map((choice) => [
     button(`${choice === selected ? "✅ " : ""}${choice}`, `set:stt:provider:${choice}`),
   ]);
@@ -190,15 +200,34 @@ export function sttWhisperModelKeyboard(context: AppContext, chatId: ChatId): In
   return { inline_keyboard: rows };
 }
 
+export function sttLangKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.sttLang || context.config.stt.language || "auto";
+  const choices = [
+    { label: "Auto-detect", id: "auto" },
+    { label: "English", id: "en" },
+    { label: "German", id: "de" },
+    { label: "French", id: "fr" },
+    { label: "Italian", id: "it" },
+    { label: "Spanish", id: "es" },
+  ];
+  const rows = choices.map((choice) => [
+    button(`${choice.id === selected ? "✅ " : ""}${choice.label} (${choice.id})`, `set:stt:lang:${choice.id}`),
+  ]);
+  rows.push([button("‹ Back", "menu:stt")]);
+  return { inline_keyboard: rows };
+}
+
 export function ttsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
   const settings = settingsFor(context, chatId);
   const mode = settings.ttsMode || context.config.tts?.mode || "off";
-  const voice = settings.ttsVoice || context.config.tts?.voice || "de-DE-ConradNeural";
+  const voice = settings.ttsVoice || context.config.tts?.voice || "en-US-AndrewMultilingualNeural";
+  const displayVoice = voice.replace(/^(en-US-|en-GB-|de-DE-)/, "").replace("Neural", "");
 
   return {
     inline_keyboard: [
       [button(`🔊 Mode: ${mode}`, "menu:tts:mode")],
-      [button(`🗣️ Voice: ${voice.replace("de-DE-", "")}`, "menu:tts:voice")],
+      [button(`🗣️ Voice: ${displayVoice}`, "menu:tts:voice")],
       [button("‹ Back", "menu:main")],
     ],
   };
@@ -217,14 +246,18 @@ export function ttsModeKeyboard(context: AppContext, chatId: ChatId): InlineKeyb
 
 export function ttsVoiceKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
   const settings = settingsFor(context, chatId);
-  const selected = settings.ttsVoice || context.config.tts?.voice || "de-DE-ConradNeural";
+  const selected = settings.ttsVoice || context.config.tts?.voice || "en-US-AndrewMultilingualNeural";
   const choices = [
-    { label: "Conrad (Männlich)", id: "de-DE-ConradNeural" },
-    { label: "Katja (Weiblich)", id: "de-DE-KatjaNeural" },
-    { label: "Killian (Männlich)", id: "de-DE-KillianNeural" },
-    { label: "Amala (Weiblich)", id: "de-DE-AmalaNeural" },
-    { label: "Florian (Multilingual)", id: "de-DE-FlorianMultilingualNeural" },
-    { label: "Seraphina (Multilingual)", id: "de-DE-SeraphinaMultilingualNeural" },
+    { label: "Andrew (English - US, Multilingual Male)", id: "en-US-AndrewMultilingualNeural" },
+    { label: "Ava (English - US, Multilingual Female)", id: "en-US-AvaMultilingualNeural" },
+    { label: "Brian (English - US, Multilingual Male)", id: "en-US-BrianMultilingualNeural" },
+    { label: "Emma (English - US, Multilingual Female)", id: "en-US-EmmaMultilingualNeural" },
+    { label: "Sonia (English - UK Female)", id: "en-GB-SoniaNeural" },
+    { label: "Ryan (English - UK Male)", id: "en-GB-RyanNeural" },
+    { label: "Florian (German Multilingual Male)", id: "de-DE-FlorianMultilingualNeural" },
+    { label: "Seraphina (German Multilingual Female)", id: "de-DE-SeraphinaMultilingualNeural" },
+    { label: "Conrad (German Male)", id: "de-DE-ConradNeural" },
+    { label: "Katja (German Female)", id: "de-DE-KatjaNeural" },
   ];
   const rows = choices.map((choice) => [
     button(`${choice.id === selected ? "✅ " : ""}${choice.label}`, `set:tts:voice:${choice.id}`),
@@ -232,4 +265,5 @@ export function ttsVoiceKeyboard(context: AppContext, chatId: ChatId): InlineKey
   rows.push([button("‹ Back", "menu:tts")]);
   return { inline_keyboard: rows };
 }
+
 

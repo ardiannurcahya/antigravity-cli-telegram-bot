@@ -354,7 +354,7 @@ command("/stt")(async ({ context, chatId, args }) => {
       `• <b>AGY Model:</b> <code>${escapeHtml(agyModel)}</code>`,
       `• <b>Language:</b> <code>${escapeHtml(lang)}</code>\n`,
       "<b>Usage:</b>",
-      "• <code>/stt provider &lt;whisper-local|agy|none&gt;</code>",
+      "• <code>/stt provider &lt;whisper-local|gemini|agy|none&gt;</code>",
       "• <code>/stt model &lt;model-name&gt;</code>",
       "• <code>/stt lang &lt;de|en|auto|...&gt;</code>",
     ].join("\n");
@@ -367,12 +367,14 @@ command("/stt")(async ({ context, chatId, args }) => {
     const val = args[1]?.toLowerCase().trim();
     if (val === "whisper" || val === "whisper-local") {
       currentSettings.sttProvider = "whisper-local";
-    } else if (val === "agy" || val === "gemini") {
+    } else if (val === "gemini" || val === "gemini-api" || val === "google") {
+      currentSettings.sttProvider = "gemini";
+    } else if (val === "agy" || val === "antigravity") {
       currentSettings.sttProvider = "agy";
     } else if (val === "none" || val === "off" || val === "disabled") {
       currentSettings.sttProvider = "none";
     } else {
-      await reply(context, chatId, "Invalid STT provider. Choose: whisper-local, agy, none.", sttKeyboard(context, chatId));
+      await reply(context, chatId, "Invalid STT provider. Choose: whisper-local, gemini, agy, none.", sttKeyboard(context, chatId));
       return;
     }
     await saveSettings(context, chatId, currentSettings);

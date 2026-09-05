@@ -13,6 +13,7 @@ import {
   resumeKeyboard,
   sandboxKeyboard,
   sttKeyboard,
+  sttLangKeyboard,
   sttProviderKeyboard,
   sttWhisperModelKeyboard,
   ttsKeyboard,
@@ -122,6 +123,7 @@ export async function showMenu(context: AppContext, chatId: ChatId, messageId: n
   if (kind === "stt") return context.telegram.editMessageText(chatId, messageId, "Select STT option to configure:", sttKeyboard(context, chatId));
   if (kind === "stt:provider") return context.telegram.editMessageText(chatId, messageId, "Select STT provider:", sttProviderKeyboard(context, chatId));
   if (kind === "stt:whisper") return context.telegram.editMessageText(chatId, messageId, "Select Whisper model:", sttWhisperModelKeyboard(context, chatId));
+  if (kind === "stt:lang") return context.telegram.editMessageText(chatId, messageId, "Select STT language:", sttLangKeyboard(context, chatId));
   if (kind === "tts") return context.telegram.editMessageText(chatId, messageId, "Select TTS option to configure:", ttsKeyboard(context, chatId));
   if (kind === "tts:mode") return context.telegram.editMessageText(chatId, messageId, "Select TTS response mode:", ttsModeKeyboard(context, chatId));
   if (kind === "tts:voice") return context.telegram.editMessageText(chatId, messageId, "Select TTS voice:", ttsVoiceKeyboard(context, chatId));

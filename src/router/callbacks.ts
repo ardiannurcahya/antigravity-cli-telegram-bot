@@ -208,7 +208,7 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     return;
   }
   if (key === "stt:provider") {
-    if (value === "whisper-local" || value === "agy" || value === "none") {
+    if (value === "whisper-local" || value === "gemini" || value === "agy" || value === "none") {
       settings.sttProvider = value;
       await saveSettings(context, chatId, settings);
       await context.telegram.editMessageText(chatId, messageId, `🎙️ STT provider set to <b>${value}</b>.`, sttKeyboard(context, chatId), "HTML");
@@ -219,6 +219,12 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     settings.sttWhisperModel = value;
     await saveSettings(context, chatId, settings);
     await context.telegram.editMessageText(chatId, messageId, `🧠 Whisper STT model set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
+    return;
+  }
+  if (key === "stt:lang") {
+    settings.sttLang = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🌐 STT language set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
     return;
   }
   if (key === "tts:mode") {

@@ -26,6 +26,12 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       AGY_EFFORT: settings.effort || "high",
       AGY_MODE: settings.mode || "accept-edits",
       AGY_SANDBOX: settings.sandbox ? "1" : "0",
+      ...(settings.sttProvider ? { STT_PROVIDER: settings.sttProvider } : {}),
+      ...(settings.sttWhisperModel ? { STT_WHISPER_MODEL: settings.sttWhisperModel } : {}),
+      ...(settings.sttAgyModel ? { STT_AGY_MODEL: settings.sttAgyModel } : {}),
+      ...(settings.sttLang ? { STT_LANGUAGE: settings.sttLang } : {}),
+      ...(settings.ttsMode ? { TTS_MODE: settings.ttsMode } : {}),
+      ...(settings.ttsVoice ? { TTS_VOICE: settings.ttsVoice } : {}),
     };
     const updatedLines = [...lines];
     for (const [key, val] of Object.entries(newVars)) {
@@ -45,7 +51,20 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
     context.config.agy.effort = settings.effort;
     context.config.agy.mode = settings.mode;
     context.config.agy.sandbox = settings.sandbox;
-    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(modelLabel(settings.model))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
+    if (context.config.stt) {
+      if (settings.sttProvider) context.config.stt.provider = settings.sttProvider;
+      if (settings.sttWhisperModel) context.config.stt.whisperModel = settings.sttWhisperModel;
+      if (settings.sttAgyModel) context.config.stt.agyModel = settings.sttAgyModel;
+      if (settings.sttLang) context.config.stt.language = settings.sttLang;
+    }
+    if (context.config.tts) {
+      if (settings.ttsMode) context.config.tts.mode = settings.ttsMode;
+      if (settings.ttsVoice) context.config.tts.voice = settings.ttsVoice;
+    }
+
+    const ttsLine = settings.ttsMode ? `\n• <b>TTS:</b> ${escapeHtml(settings.ttsMode)} (${escapeHtml(settings.ttsVoice || "default")})` : "";
+    const sttLine = settings.sttProvider ? `\n• <b>STT:</b> ${escapeHtml(settings.sttProvider)} (${escapeHtml(settings.sttLang || "auto")})` : "";
+    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(modelLabel(settings.model))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}${ttsLine}${sttLine}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
     if (messageId) {
       await context.telegram.editMessageText(chatId, messageId, text, { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
     } else {
