@@ -10,10 +10,10 @@ export async function cleanupSessionTempFiles(tempDir: string, chatId: ChatId): 
   try {
     await fs.rm(sessionDir, { recursive: true, force: true });
   } catch {
-    // Non-existent directory ignored
+    // Ignore missing directory
   }
 
-  // Clean up residual files in tempDir root
+  // Also clean residual session files at the root of tempDir
   try {
     const entries = await fs.readdir(tempDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -22,12 +22,12 @@ export async function cleanupSessionTempFiles(tempDir: string, chatId: ChatId): 
       }
     }
   } catch {
-    // Non-existent temp directory ignored
+    // Ignore missing temp directory
   }
 }
 
 /**
- * Removes orphan or expired temporary files and directories (older than 24h).
+ * Removes orphaned or expired temporary files and directories (older than 24h).
  */
 export async function cleanupStaleTempFiles(tempDir: string, maxAgeMs = 24 * 60 * 60 * 1000): Promise<void> {
   try {
@@ -50,7 +50,6 @@ export async function cleanupStaleTempFiles(tempDir: string, maxAgeMs = 24 * 60 
       }
     }
   } catch {
-    // Inaccessible directory ignored
+    // Ignore inaccessible directory
   }
 }
-

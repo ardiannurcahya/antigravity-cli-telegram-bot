@@ -300,3 +300,87 @@ Inline code: \`$22\\,\\%\` und \`\\rightarrow\` bleiben unverändert.`;
   assert.doesNotMatch(html, /69\{,\}5/);
 });
 
+test("formatTelegramHtml handles nested code fences without premature closure", () => {
+  const input = [
+    "```markdown",
+    "Here is an explanation:",
+    "#### 2. Pluggable Adapter Pattern",
+    "",
+    "```typescript",
+    "export interface TranscriptionResult {",
+    "  text: string;",
+    "  options?: { signal?: AbortSignal };",
+    "}",
+    "```",
+    "",
+    "Configured via environment variables.",
+    "```",
+  ].join("\n");
+
+  const html = formatTelegramHtml(input);
+  assert.ok(html.startsWith('<pre><code class="language-markdown">'));
+  assert.ok(html.endsWith("</code></pre>"));
+  assert.ok(html.includes("#### 2. Pluggable Adapter Pattern"));
+  assert.ok(html.includes("export interface TranscriptionResult"));
+  assert.ok(html.includes("options?: { signal?: AbortSignal };"));
+  assert.ok(html.includes("Configured via environment variables."));
+  const preCount = (html.match(/<pre>/g) || []).length;
+  assert.equal(preCount, 1);
+});
+
+test("formatTelegramHtml handles 4-backtick code fences enclosing 3-backtick fences", () => {
+  const input = [
+    "````markdown",
+    "Here is code:",
+    "```typescript",
+    "const ok = true;",
+    "```",
+    "````",
+  ].join("\n");
+
+  const html = formatTelegramHtml(input);
+  assert.ok(html.startsWith('<pre><code class="language-markdown">'));
+  assert.ok(html.endsWith("</code></pre>"));
+  assert.ok(html.includes("const ok = true;"));
+  const preCount = (html.match(/<pre>/g) || []).length;
+  assert.equal(preCount, 1);
+});
+
+test("formatTelegramHtml handles multiple sequential code blocks properly", () => {
+  const input = [
+    "```typescript",
+    "const a = 1;",
+    "```",
+    "",
+    "Normal text in between.",
+    "",
+    "```bash",
+    "npm test",
+    "```",
+  ].join("\n");
+
+  const html = formatTelegramHtml(input);
+  assert.ok(html.includes('<pre><code class="language-typescript">const a = 1;</code></pre>'));
+  assert.ok(html.includes("Normal text in between."));
+  assert.ok(html.includes('<pre><code class="language-bash">npm test</code></pre>'));
+  const preCount = (html.match(/<pre>/g) || []).length;
+  assert.equal(preCount, 2);
+});
+
+test("formatTelegramHtml preserves object and type curly braces in regular text", () => {
+  const input = "Set the options parameter to { timeoutMs: 5000, signal?: AbortSignal } for safety.";
+  const html = formatTelegramHtml(input);
+  assert.ok(html.includes("{ timeoutMs: 5000, signal?: AbortSignal }"));
+});
+
+test("splitMessage splits at word boundaries when newline is not available", () => {
+  const text = "transcode locally requires installing system-level ffmpeg and native C++ bindings for whisper.";
+  const chunks = splitMessage(text, 40);
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    assert.ok(chunk.length <= 40);
+  }
+  assert.equal(chunks[0], "transcode locally requires installing");
+});
+
+
