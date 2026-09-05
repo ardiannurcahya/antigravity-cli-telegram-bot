@@ -85,7 +85,14 @@ test("does not break a large code block when chunking", () => {
 
 test("escapeHtml properly escapes reserved HTML characters", () => {
   assert.equal(escapeHtml("<script>alert('xss') & test</script>"), "&lt;script&gt;alert('xss') &amp; test&lt;/script&gt;");
-  assert.equal(escapeHtml('Audit <Repo> & "Deploy"'), "Audit &lt;Repo&gt; &amp; &quot;Deploy&quot;");
+  assert.equal(escapeHtml('Audit <Repo> & "Deploy"'), 'Audit &lt;Repo&gt; &amp; "Deploy"');
+});
+
+test("formatTelegramHtml preserves double quotes in code blocks without escaping to &quot;", () => {
+  const markdown = '```python\nwith open("test.txt", "r", encoding="utf-8") as f:\n    data = f.read()\n```';
+  const html = formatTelegramHtml(markdown);
+  assert.ok(html.includes('<pre><code class="language-python">with open("test.txt", "r", encoding="utf-8") as f:'));
+  assert.doesNotMatch(html, /&quot;/);
 });
 
 test("findReferencedMediaFiles detects markdown images and file paths", async () => {
@@ -160,8 +167,8 @@ test("sanitizes HTML injection and escapes reserved characters inside preformatt
   assert.ok(html.endsWith("</blockquote>"));
   assert.doesNotMatch(html, /<script>/);
   assert.doesNotMatch(html, /<a href="https:\/\/phishing\.com">/);
-  assert.ok(html.includes("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;"));
-  assert.ok(html.includes("&lt;a href=&quot;https://phishing.com&quot;&gt;malicious&lt;/a&gt;"));
+  assert.ok(html.includes('&lt;script&gt;alert("xss")&lt;/script&gt;'));
+  assert.ok(html.includes('&lt;a href="https://phishing.com"&gt;malicious&lt;/a&gt;'));
   assert.ok(html.includes("x &lt; 10 &amp; y &gt; 20"));
 });
 
