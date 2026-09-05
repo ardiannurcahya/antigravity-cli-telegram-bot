@@ -81,6 +81,8 @@ export class WhisperLocalSttService implements SttService {
       "txt",
       "--output_dir",
       outputDir,
+      "--fp16",
+      "False",
     ];
 
     if (lang && lang !== "auto") {
