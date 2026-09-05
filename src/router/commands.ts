@@ -12,6 +12,7 @@ import {
   outputFormatKeyboard,
   sandboxKeyboard,
   sttKeyboard,
+  ttsKeyboard,
   verboseKeyboard,
   workspaceKeyboard,
 } from "../ui/inline-keyboards.js";
@@ -410,6 +411,56 @@ command("/stt")(async ({ context, chatId, args }) => {
   }
 
   await reply(context, chatId, "Unknown STT option. Use <code>/stt</code> to view settings and options.", sttKeyboard(context, chatId));
+});
+
+command("/tts")(async ({ context, chatId, args }) => {
+  const currentSettings = settingsFor(context, chatId);
+  if (args.length === 0) {
+    const mode = currentSettings.ttsMode || "off";
+    const voice = currentSettings.ttsVoice || "de-DE-ConradNeural";
+    const text = [
+      "🔊 <b>Text-to-Speech (TTS) Voice Output Settings:</b>\n",
+      `• <b>Mode:</b> <code>${escapeHtml(mode)}</code>`,
+      `• <b>Voice:</b> <code>${escapeHtml(voice)}</code>\n`,
+      "<b>Modes:</b>",
+      "• <code>off</code>: No voice answers",
+      "• <code>auto</code>: Voice answer only when prompt was a voice note",
+      "• <code>voice-only</code>: Voice answer only (no text)",
+      "• <code>voice-and-text</code>: Both voice note and text answer\n",
+      "<b>Usage:</b>",
+      "• <code>/tts mode &lt;off|auto|voice-only|voice-and-text&gt;</code>",
+      "• <code>/tts voice &lt;voice-name&gt;</code>",
+    ].join("\n");
+    await replyWithHtml(context, chatId, text, ttsKeyboard(context, chatId));
+    return;
+  }
+
+  const sub = args[0].toLowerCase().trim();
+  if (sub === "mode") {
+    const val = args[1]?.toLowerCase().trim();
+    if (["off", "voice-only", "voice-and-text", "auto"].includes(val)) {
+      currentSettings.ttsMode = val as any;
+      await saveSettings(context, chatId, currentSettings);
+      await replyWithHtml(context, chatId, `🔊 TTS mode set to <code>${val}</code>.`, createMainKeyboard(currentSettings));
+      return;
+    }
+    await reply(context, chatId, "Invalid TTS mode. Choose: off, auto, voice-only, voice-and-text.", ttsKeyboard(context, chatId));
+    return;
+  }
+
+  if (sub === "voice") {
+    const val = args.slice(1).join(" ").trim();
+    if (!val) {
+      await reply(context, chatId, "Please specify a voice name. E.g. <code>/tts voice de-DE-ConradNeural</code>.", ttsKeyboard(context, chatId));
+      return;
+    }
+    currentSettings.ttsVoice = val;
+    await saveSettings(context, chatId, currentSettings);
+    await replyWithHtml(context, chatId, `🗣️ TTS voice set to <code>${escapeHtml(val)}</code>.`, createMainKeyboard(currentSettings));
+    return;
+  }
+
+  await reply(context, chatId, "Unknown TTS option. Use <code>/tts</code> to view settings and options.", ttsKeyboard(context, chatId));
 });
 
 command("/new-project", "/disable-slash-commands")(async ({ context, chatId, command, args }) => {

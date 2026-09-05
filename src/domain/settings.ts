@@ -21,6 +21,8 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     sttWhisperModel: config.stt?.whisperModel ?? "base",
     sttAgyModel: config.stt?.agyModel ?? "gemini-3.8-flash-low",
     sttLang: config.stt?.language ?? "de",
+    ttsMode: config.tts?.mode ?? "off",
+    ttsVoice: config.tts?.voice ?? "de-DE-ConradNeural",
   };
   const stored = context.state.session(chatId)?.settings || {};
   const settings: SessionSettings = {
@@ -44,6 +46,8 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     sttWhisperModel: typeof stored.sttWhisperModel === "string" && stored.sttWhisperModel.trim() ? stored.sttWhisperModel.trim() : defaults.sttWhisperModel,
     sttAgyModel: typeof stored.sttAgyModel === "string" && stored.sttAgyModel.trim() ? stored.sttAgyModel.trim() : defaults.sttAgyModel,
     sttLang: typeof stored.sttLang === "string" && stored.sttLang.trim() ? stored.sttLang.trim() : defaults.sttLang,
+    ttsMode: stored.ttsMode === "off" || stored.ttsMode === "voice-only" || stored.ttsMode === "voice-and-text" || stored.ttsMode === "auto" ? stored.ttsMode : defaults.ttsMode,
+    ttsVoice: typeof stored.ttsVoice === "string" && stored.ttsVoice.trim() ? stored.ttsVoice.trim() : defaults.ttsVoice,
   };
   if (config.agy.sandbox && !config.agy.allowSandboxDisable) settings.sandbox = true;
   return settings;

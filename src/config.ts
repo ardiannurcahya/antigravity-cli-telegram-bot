@@ -58,6 +58,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       timeoutMs: positiveIntegerFrom(env, "STT_TIMEOUT_MS", 15_000),
       showTranscript: booleanFrom(env, "TELEGRAM_STT_SHOW_TRANSCRIPT", true),
     },
+    tts: {
+      mode: ttsModeFrom(env),
+      voice: (env.TTS_VOICE || "de-DE-ConradNeural").trim(),
+      bin: (env.TTS_BIN || "/home/ubuntu/.local/bin/edge-tts").trim(),
+      timeoutMs: positiveIntegerFrom(env, "TTS_TIMEOUT_MS", 25_000),
+    },
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),
     tempDir: (env.TEMP_DIR || "/var/lib/agy-telegram/tmp").trim(), logLevel: (env.LOG_LEVEL || "info").trim(),
@@ -68,6 +74,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 export function isMode(value: string): value is "plan" | "accept-edits" { return value === "plan" || value === "accept-edits"; }
 export function isEffort(value: string): value is "low" | "medium" | "high" { return value === "low" || value === "medium" || value === "high"; }
 export function isVerbose(value: string): value is "silent" | "compact" | "detailed" { return value === "silent" || value === "compact" || value === "detailed"; }
+export function isTtsMode(value: string): value is "off" | "voice-only" | "voice-and-text" | "auto" {
+  return value === "off" || value === "voice-only" || value === "voice-and-text" || value === "auto";
+}
 
 function modelsFrom(env: Record<string, string | undefined>): string[] {
   const configured = (env.AGY_ALLOWED_MODELS || "").split(",").map((value) => value.trim()).filter(Boolean);
@@ -124,5 +133,14 @@ function sttProviderFrom(env: Record<string, string | undefined>): "agy" | "whis
   if (["whisper", "whisper-local", "local-whisper"].includes(raw)) return "whisper-local";
   if (["none", "off", "false", "0", "disabled"].includes(raw)) return "none";
   throw new Error(`STT_PROVIDER must be 'agy', 'whisper-local', or 'none' (received: ${raw})`);
+}
+
+function ttsModeFrom(env: Record<string, string | undefined>): "off" | "voice-only" | "voice-and-text" | "auto" {
+  const raw = (env.TTS_MODE || env.TELEGRAM_TTS_MODE || "off").trim().toLowerCase();
+  if (["off", "false", "0", "disabled", "none"].includes(raw)) return "off";
+  if (["voice-only", "voice", "audio", "only"].includes(raw)) return "voice-only";
+  if (["voice-and-text", "both", "all", "text-and-voice"].includes(raw)) return "voice-and-text";
+  if (["auto", "smart"].includes(raw)) return "auto";
+  throw new Error(`TTS_MODE must be 'off', 'voice-only', 'voice-and-text', or 'auto' (received: ${raw})`);
 }
 

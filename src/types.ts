@@ -65,6 +65,8 @@ export interface SessionSettings {
   sttWhisperModel?: string;
   sttAgyModel?: string;
   sttLang?: string;
+  ttsMode?: "off" | "voice-only" | "voice-and-text" | "auto";
+  ttsVoice?: string;
 }
 
 export interface Usage {
@@ -160,6 +162,12 @@ export interface AppConfig {
     language: string;
     timeoutMs: number;
     showTranscript: boolean;
+  };
+  tts?: {
+    mode: "off" | "voice-only" | "voice-and-text" | "auto";
+    voice: string;
+    bin: string;
+    timeoutMs: number;
   };
   queue: { maxSize: number };
   stateFile: string;

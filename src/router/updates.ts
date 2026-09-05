@@ -255,7 +255,16 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       return;
     }
     if (text.startsWith("/")) { await reply(context, sessionKey, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, sessionKey))); return; }
-    enqueueJob(context, sessionKey, { prompt: text, kind: "prompt", imagePath, documentPath, documentName, mediaPath, mediaType });
+    enqueueJob(context, sessionKey, {
+      prompt: text,
+      kind: "prompt",
+      imagePath,
+      documentPath,
+      documentName,
+      mediaPath,
+      mediaType,
+      wasVoiceInput: Boolean(isVoice && transcribedText),
+    });
   } catch (error) {
     console.error("handleUpdate error:", error);
   }

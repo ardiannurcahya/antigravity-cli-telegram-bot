@@ -393,6 +393,51 @@ export class TelegramClient {
     }
     throw new Error("Telegram sendDocument failed: max retries reached");
   }
+
+  public async sendVoice(chatId: ChatId, voicePath: string | Buffer, caption?: string, replyMarkup?: ReplyMarkup, duration?: number, _signal?: AbortSignal, maxRetries = 3): Promise<unknown> {
+    const target = parseChatTarget(chatId);
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      try {
+        const form = new FormData();
+        form.append("chat_id", String(target.chatId));
+        if (target.messageThreadId !== undefined) {
+          form.append("message_thread_id", String(target.messageThreadId));
+        }
+        if (typeof voicePath === "string") {
+          const fileBuffer = await fs.readFile(voicePath);
+          form.append("voice", new Blob([new Uint8Array(fileBuffer)], { type: "audio/ogg" }), path.basename(voicePath));
+        } else {
+          form.append("voice", new Blob([new Uint8Array(voicePath)], { type: "audio/ogg" }), "voice.ogg");
+        }
+        if (caption) {
+          form.append("caption", caption.slice(0, 1024));
+          form.append("parse_mode", "HTML");
+        }
+        if (duration) {
+          form.append("duration", String(Math.round(duration)));
+        }
+        if (replyMarkup) {
+          form.append("reply_markup", JSON.stringify(replyMarkup));
+        }
+        const response = await fetch(`${this.root}/sendVoice`, { method: "POST", body: form, signal: AbortSignal.timeout(60000) });
+        const body = await response.json() as { ok: boolean; result?: unknown; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+        if (response.ok && body.ok) return body.result;
+        const retryAfter = body.parameters?.retry_after;
+        if (retryAfter && attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, (retryAfter + 1) * 1000));
+          continue;
+        }
+        throw new TelegramApiError(`Telegram sendVoice failed: ${body.description || response.status}`, body.error_code ?? response.status, retryAfter);
+      } catch (err) {
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("Telegram sendVoice failed: max retries reached");
+  }
   public getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }> {
     return this.call("getFile", { file_id: fileId });
   }

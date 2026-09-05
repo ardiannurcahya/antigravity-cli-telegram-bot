@@ -25,8 +25,16 @@ const RESUME_USE_PREFIX = "resume:use:";
 export function parseCallbackAction(data: string): CallbackAction | null {
   if (data === "noop") return { kind: "noop" };
   if (data.startsWith("menu:")) {
-    const parts = data.split(":");
-    return { kind: "menu", menu: parts[1], page: parts[2] ? Number(parts[2]) : 0 };
+    const rest = data.slice("menu:".length);
+    const parts = rest.split(":");
+    // Check if the last part is a numeric page index
+    const lastPart = parts[parts.length - 1];
+    if (parts.length > 1 && /^\d+$/.test(lastPart)) {
+      const page = Number(lastPart);
+      const menu = parts.slice(0, -1).join(":");
+      return { kind: "menu", menu, page };
+    }
+    return { kind: "menu", menu: rest, page: 0 };
   }
   if (data.startsWith(RESUME_PAGE_PREFIX)) {
     return { kind: "resume-page", page: Number(data.slice(RESUME_PAGE_PREFIX.length)) || 0 };

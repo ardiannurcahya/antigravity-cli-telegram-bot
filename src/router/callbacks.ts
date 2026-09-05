@@ -10,6 +10,7 @@ import {
   button,
   cliOptionsKeyboard,
   sttKeyboard,
+  ttsKeyboard,
   verboseKeyboard,
 } from "../ui/inline-keyboards.js";
 import { cliOutput, CLI_COMMANDS, showCliOption, showMain, showMenu, showResumeMenu, type CliCommand } from "../ui/screens.js";
@@ -218,6 +219,20 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     settings.sttWhisperModel = value;
     await saveSettings(context, chatId, settings);
     await context.telegram.editMessageText(chatId, messageId, `🧠 Whisper STT model set to <b>${escapeHtml(value)}</b>.`, sttKeyboard(context, chatId), "HTML");
+    return;
+  }
+  if (key === "tts:mode") {
+    if (["off", "voice-only", "voice-and-text", "auto"].includes(value)) {
+      settings.ttsMode = value as any;
+      await saveSettings(context, chatId, settings);
+      await context.telegram.editMessageText(chatId, messageId, `🔊 TTS mode set to <b>${value}</b>.`, ttsKeyboard(context, chatId), "HTML");
+      return;
+    }
+  }
+  if (key === "tts:voice") {
+    settings.ttsVoice = value;
+    await saveSettings(context, chatId, settings);
+    await context.telegram.editMessageText(chatId, messageId, `🗣️ TTS voice set to <b>${escapeHtml(value)}</b>.`, ttsKeyboard(context, chatId), "HTML");
     return;
   }
   await saveSettings(context, chatId, settings);

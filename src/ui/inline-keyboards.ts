@@ -118,9 +118,9 @@ export function mainInlineKeyboard(): InlineKeyboardMarkup {
       [button("Changelog", "cli:changelog"), button("CLI help", "cli:help")],
       [button("CLI version", "cli:version"), button("Custom /agy", "menu:custom")],
       [button("Plugin actions", "menu:plugins"), button("Update CLI", "cli:update")],
-      [button("🎙️ Voice / STT", "menu:stt"), button("💾 Set as Default", "action:setdefault")],
-      [button("🔄 Update Bot", "action:update_bot"), button("New session", "action:new")],
-      [button("Cancel", "action:cancel")],
+      [button("🎙️ STT", "menu:stt"), button("🔊 TTS", "menu:tts")],
+      [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
+      [button("🔄 Update Bot", "action:update_bot"), button("Cancel", "action:cancel")],
     ],
   };
 }
@@ -189,3 +189,47 @@ export function sttWhisperModelKeyboard(context: AppContext, chatId: ChatId): In
   rows.push([button("‹ Back", "menu:stt")]);
   return { inline_keyboard: rows };
 }
+
+export function ttsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const mode = settings.ttsMode || context.config.tts?.mode || "off";
+  const voice = settings.ttsVoice || context.config.tts?.voice || "de-DE-ConradNeural";
+
+  return {
+    inline_keyboard: [
+      [button(`🔊 Mode: ${mode}`, "menu:tts:mode")],
+      [button(`🗣️ Voice: ${voice.replace("de-DE-", "")}`, "menu:tts:voice")],
+      [button("‹ Back", "menu:main")],
+    ],
+  };
+}
+
+export function ttsModeKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.ttsMode || context.config.tts?.mode || "off";
+  const choices: Array<"off" | "voice-only" | "voice-and-text" | "auto"> = ["off", "voice-only", "voice-and-text", "auto"];
+  const rows = choices.map((choice) => [
+    button(`${choice === selected ? "✅ " : ""}${choice}`, `set:tts:mode:${choice}`),
+  ]);
+  rows.push([button("‹ Back", "menu:tts")]);
+  return { inline_keyboard: rows };
+}
+
+export function ttsVoiceKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const selected = settings.ttsVoice || context.config.tts?.voice || "de-DE-ConradNeural";
+  const choices = [
+    { label: "Conrad (Männlich)", id: "de-DE-ConradNeural" },
+    { label: "Katja (Weiblich)", id: "de-DE-KatjaNeural" },
+    { label: "Killian (Männlich)", id: "de-DE-KillianNeural" },
+    { label: "Amala (Weiblich)", id: "de-DE-AmalaNeural" },
+    { label: "Florian (Multilingual)", id: "de-DE-FlorianMultilingualNeural" },
+    { label: "Seraphina (Multilingual)", id: "de-DE-SeraphinaMultilingualNeural" },
+  ];
+  const rows = choices.map((choice) => [
+    button(`${choice.id === selected ? "✅ " : ""}${choice.label}`, `set:tts:voice:${choice.id}`),
+  ]);
+  rows.push([button("‹ Back", "menu:tts")]);
+  return { inline_keyboard: rows };
+}
+

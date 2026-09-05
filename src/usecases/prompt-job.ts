@@ -15,6 +15,7 @@ import { reply, replyWithFormattedResponse, replyWithHtml } from "../ui/reply.js
 import { usageText } from "../ui/messages.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
 import { parseChatTarget } from "../telegram/client.js";
+import { createTtsService } from "../tts/tts-service.js";
 import type { StreamEvent } from "../types.js";
 
 type PtyReportKind = "usage" | "credits" | "context";
@@ -347,8 +348,43 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
 
     const responseBody = responsePrefix ? `${responsePrefix}${formattedText}` : formattedText;
 
-    if (responseBody.length > context.config.telegram.maxMessageChars * 2) await context.telegram.sendDocument(job.chatId, `agy-${job.id}.md`, responseBody);
-    else await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
+    const ttsMode = settings.ttsMode || context.config.tts?.mode || "off";
+    const shouldSendVoice =
+      ttsMode === "voice-only" ||
+      ttsMode === "voice-and-text" ||
+      (ttsMode === "auto" && Boolean(job.wasVoiceInput));
+
+    const shouldSendText = ttsMode !== "voice-only" || !shouldSendVoice;
+
+    if (shouldSendText) {
+      if (responseBody.length > context.config.telegram.maxMessageChars * 2) {
+        await context.telegram.sendDocument(job.chatId, `agy-${job.id}.md`, responseBody);
+      } else {
+        await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
+      }
+    }
+
+    if (shouldSendVoice && result.text) {
+      const ttsService = createTtsService(context.config, settings);
+      if (ttsService && ttsService.isAvailable()) {
+        try {
+          await context.telegram.sendChatAction(job.chatId, "record_voice");
+          const synth = await ttsService.synthesize(result.text, {
+            voice: settings.ttsVoice || context.config.tts?.voice,
+            signal: controller.signal,
+          });
+          const markup = shouldSendText ? undefined : createMainKeyboard(settingsFor(context, job.chatId));
+          await context.telegram.sendVoice(job.chatId, synth.audioPath, undefined, markup);
+          await fs.unlink(synth.audioPath).catch(() => undefined);
+        } catch (ttsErr) {
+          console.error("[TTS] Synthesis or delivery failed:", (ttsErr as Error).message);
+          if (!shouldSendText) {
+            // Fallback to text if voice-only failed
+            await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
+          }
+        }
+      }
+    }
   } catch (error) {
     if (isCancelled() || controller.signal.aborted || (error instanceof Error && error.message.includes("cancelled"))) {
       if (progressMessage) await context.telegram.editMessageText(job.chatId, progressMessage.message_id, `${wsNotice}⛔ Request cancelled by user.`, undefined, "HTML").catch(() => undefined);
