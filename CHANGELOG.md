@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0-alpha.1] - 2026-09-06
+
+### Added
+- **Voice I/O Capabilities (Speech-to-Text & Text-to-Speech)**: Complete native voice interaction with pluggable adapters, strictly opt-in by default (`STT_PROVIDER=none`, `TTS_MODE=off`):
+  - **Speech-to-Text (STT)**: Transcribes inbound Telegram voice notes into prompt text using `gemini` (cloud audio buffer), `whisper-local` (offline local whisper CLI), or `agy` (multimodal CLI transcription). Includes interactive `/stt` settings keyboard and language selection.
+  - **Text-to-Speech (TTS)**: Synthesizes responses into native Telegram voice notes using `edge-tts` with natural code indicator replacement. Includes `/tts` configuration and flexible response modes (`auto`, `voice-and-text`, `voice-only`).
+- **Per-Session Workspace Scoping (`/workspace`)**:
+  - Dynamically switch working directories per session with `/workspace <name|path>` or `/workspace clear`.
+  - **Forum Topics Binding**: Dedicated project topics persistently bind to their target repository across `/new` resets.
+  - **1:1 DM Ephemeral Reset (Option A)**: Private chats automatically revert to default `AGY_WORKSPACE` on `/new` to preserve friction-free daily assistant workflows.
+  - **Interactive Project Picker**: Paginated inline keyboard listing available project directories.
+  - **Security Boundary**: Strict `isWithin` path containment against authorized root directories to prevent directory traversal.
+- **Expandable Delegation Blockquotes**:
+  - Automatically isolates intermediate subagent execution turns into native Telegram `<blockquote expandable>` above the final response in `verbose: detailed` mode, while cleanly omitting them in `compact` mode.
+
+### Fixed
+- **Nested Code Fence Rendering**: Correctly parses nested code blocks (e.g. internal code fences within Markdown documentation blocks) using CommonMark fence length and nesting depth tracking.
+- **Brace Stripping in LaTeX Math**: Preserved object and TypeScript type curly braces (`{}`) in regular text by targeting only actual LaTeX command argument blocks.
+- **Word-Boundary Chunk Splitting**: Slices long messages on whitespace boundaries instead of cutting words in half when line breaks are absent.
+
 ## [0.4.0] - 2026-09-03
 
 ### Added
@@ -152,6 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standalone AGY Telegram gateway
 - TypeScript migration
 
+[0.5.0-alpha.1]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.4.0...v0.5.0-alpha.1
 [0.4.0]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.1.8...v0.2.0
