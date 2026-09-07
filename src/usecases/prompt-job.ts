@@ -120,6 +120,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       undefined,
       "HTML"
     );
+    void context.telegram.sendChatAction(job.chatId).catch(() => undefined);
     const startedAt = Date.now();
     const recentSteps: string[] = [];
 
