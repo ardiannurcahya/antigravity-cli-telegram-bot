@@ -573,15 +573,15 @@ test("location, venue, and contact messages synthesize rich context into prompt"
         from: { id: 111 },
         contact: {
           phone_number: "+41791234567",
-          first_name: "Stephan",
-          last_name: "Bolten",
-          vcard: "BEGIN:VCARD\nVERSION:3.0\nFN:Stephan Bolten\nTEL:+41791234567\nEND:VCARD",
+          first_name: "Jane",
+          last_name: "Doe",
+          vcard: "BEGIN:VCARD\nVERSION:3.0\nFN:Jane Doe\nTEL:+41791234567\nEND:VCARD",
         },
       },
     });
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(harness.capturedJobs.length, 3);
-    assert.match(harness.capturedJobs[2].prompt ?? "", /\[Contact shared: Stephan Bolten \(\+41791234567\) \| vCard saved: .*contact_.*\.vcf\]/);
+    assert.match(harness.capturedJobs[2].prompt ?? "", /\[Contact shared: Jane Doe \(\+41791234567\) \| vCard saved: .*contact_.*\.vcf\]/);
   } finally {
     harness.cleanup();
   }
