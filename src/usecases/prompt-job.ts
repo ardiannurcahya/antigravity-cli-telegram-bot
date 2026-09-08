@@ -170,6 +170,15 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       if (verbose === "silent") return;
 
       const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0);
+
+      if (verbose === "compact") {
+        const latestStep = recentSteps.length > 0 ? recentSteps[recentSteps.length - 1] : "";
+        const compactStatus = latestStep ? ` · ${latestStep}` : "";
+        pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${modelLabel(settings.model)}${compactStatus})`;
+        void flushProgress();
+        return;
+      }
+
       const stepsDisplay = recentSteps.map((s, idx) => {
         const isLatest = idx === recentSteps.length - 1;
         return `${isLatest ? "➜" : "✓"} ${s}`;
