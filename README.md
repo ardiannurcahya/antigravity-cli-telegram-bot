@@ -75,7 +75,7 @@ service under a dedicated Unix user.
 - Clean modular architecture (`domain`, `infra`, `router`, `telegram`, `ui`, `usecases`).
 - Hardened security: Bitwise 128-bit IPv6 SSRF protection, strict path containment (`isWithin`), secret scrubbing, and safe permission defaults.
 - Dangerous plugin, update, install, and permission operations require an explicit second confirmation.
-- Per-session workspace isolation: scope AGY's working directory dynamically with `/workspace <name|path>`, automatically reverting to global root on `/new` in 1:1 DMs (Option A) and preserving topic binding in forum supergroups.
+- Per-session workspace isolation: scope AGY's working directory dynamically with `/workspace <name|path>`, automatically reverting to global root on `/new` in 1:1 DMs and preserving topic binding in forum supergroups.
 - AGY is restricted to the configured workspace by default.
 
 ## Architecture
@@ -298,7 +298,7 @@ For software development workflows, `/workspace` enables scoping the working dir
 /workspace clear           # Revert back to the default AGY_WORKSPACE
 ```
 
-#### Lifecycle and Mental Model (Option A)
+#### Lifecycle and Mental Model
 - **1:1 Direct Messages (Ephemeral)**: Starting a new conversation with `/new` automatically resets the session **and** reverts the workspace back to `AGY_WORKSPACE`. This ensures ad-hoc debugging or coding sessions never accidentally linger or trap subsequent personal assistant tasks in a code repository.
 - **Forum Topics (Persistent Binding)**: In Telegram supergroups with forum topics, running `/new` within a dedicated topic clears the conversation history but **preserves the topic's project workspace binding**. This allows project-specific threads (e.g. `#my-app`) to stay anchored to their repository.
 - **Visual Feedback on Prompt**: When a custom workspace is bound to a session, every prompt immediately displays a clear workspace confirmation banner in the live progress message (`📁 Workspace: /path/to/project`).
