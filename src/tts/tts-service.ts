@@ -43,7 +43,7 @@ export class EdgeTtsService implements TtsService {
     private readonly binPath: string = "/home/ubuntu/.local/bin/edge-tts",
     private readonly defaultVoice: string = "en-US-AndrewMultilingualNeural",
     private readonly tempDir: string = os.tmpdir(),
-    private readonly timeoutMs: number = 25000
+    private readonly timeoutMs: number = 60000
   ) {}
 
   public isAvailable(): boolean {
@@ -59,8 +59,8 @@ export class EdgeTtsService implements TtsService {
       throw new Error("No pronounceable text available for TTS.");
     }
 
-    // Limit text length to avoid overly long audio (e.g. max 3500 chars)
-    const truncatedText = speechText.length > 3500 ? `${speechText.slice(0, 3500)}...` : speechText;
+    // Limit text length to avoid overly long audio (e.g. max 2500 chars for voice notes)
+    const truncatedText = speechText.length > 2500 ? `${speechText.slice(0, 2500)}...` : speechText;
 
     const voice = options?.voice || this.defaultVoice;
     const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -103,7 +103,7 @@ export function createTtsService(config: AppConfig, settings?: SessionSettings):
 
   const voice = settings?.ttsVoice || config.tts?.voice || "en-US-AndrewMultilingualNeural";
   const bin = config.tts?.bin || "/home/ubuntu/.local/bin/edge-tts";
-  const timeoutMs = config.tts?.timeoutMs || 25000;
+  const timeoutMs = config.tts?.timeoutMs || 60000;
   return new EdgeTtsService(bin, voice, config.tempDir, timeoutMs);
 }
 

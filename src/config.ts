@@ -64,7 +64,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       mode: ttsModeFrom(env),
       voice: (env.TTS_VOICE || "en-US-AndrewMultilingualNeural").trim(),
       bin: (env.TTS_BIN || "/home/ubuntu/.local/bin/edge-tts").trim(),
-      timeoutMs: positiveIntegerFrom(env, "TTS_TIMEOUT_MS", 25_000),
+      timeoutMs: positiveIntegerFrom(env, "TTS_TIMEOUT_MS", 60_000),
     },
     queue: { maxSize: positiveIntegerFrom(env, "MAX_QUEUE_SIZE", 8) },
     stateFile: (env.STATE_FILE || "/var/lib/agy-telegram/state.json").trim(),

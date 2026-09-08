@@ -8,6 +8,7 @@ import { StateStore } from "./state.js";
 import { TelegramClient } from "./telegram.js";
 import { acquireInstanceLock, releaseInstanceLock } from "./infra/instance-lock.js";
 import { createAppServices, createBot } from "./bot.js";
+import { warmupWhisperLocal } from "./stt/stt-service.js";
 
 dns.setDefaultResultOrder?.("ipv4first");
 
@@ -32,6 +33,10 @@ const services = createAppServices({
   convDb: new ConversationDatabase(config.agy.dbPath),
   telegram: new TelegramClient(config.telegram.token),
 });
+
+if (config.stt?.provider === "whisper-local") {
+  void warmupWhisperLocal(config);
+}
 
 process.on("unhandledRejection", (reason) => {
   console.error("[process] Unhandled Promise Rejection:", reason);

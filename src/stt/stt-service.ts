@@ -18,6 +18,49 @@ export function isWhisperInstalled(bin = "whisper"): boolean {
   return isBinaryAvailable(bin);
 }
 
+let whisperWarmupPromise: Promise<boolean> | null = null;
+
+/**
+ * Preloads Whisper dependencies and Python environments asynchronously in the background.
+ * Strictly non-blocking and safe: only executes if whisper-local is configured and binary exists.
+ */
+export function warmupWhisperLocal(config: AppConfig): Promise<boolean> {
+  if (whisperWarmupPromise) return whisperWarmupPromise;
+
+  const bin = config.stt?.whisperBin || "whisper";
+  if (!isWhisperInstalled(bin)) {
+    return Promise.resolve(false);
+  }
+
+  whisperWarmupPromise = new Promise<boolean>((resolve) => {
+    try {
+      const child = spawn(bin, ["--help"], {
+        stdio: ["ignore", "ignore", "ignore"],
+        env: { ...process.env },
+      });
+
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        resolve(false);
+      }, 15000);
+
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        resolve(code === 0);
+      });
+
+      child.on("error", () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+
+  return whisperWarmupPromise;
+}
+
 export class AgySttService implements SttService {
   constructor(private readonly config: AppConfig) {}
 

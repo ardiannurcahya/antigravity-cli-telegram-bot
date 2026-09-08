@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AgySttService, GeminiSttService, WhisperLocalSttService, createSttService } from "../src/stt/stt-service.js";
+import { AgySttService, GeminiSttService, WhisperLocalSttService, createSttService, warmupWhisperLocal } from "../src/stt/stt-service.js";
 import type { AppConfig } from "../src/types.js";
 
 function mockConfig(overrides?: Partial<AppConfig>): AppConfig {
@@ -67,6 +67,12 @@ test("createSttService returns null when provider is 'none'", () => {
   const config = mockConfig({ stt: { ...mockConfig().stt, provider: "none" } });
   const service = createSttService(config);
   assert.equal(service, null);
+});
+
+test("warmupWhisperLocal returns false gracefully if binary is missing", async () => {
+  const config = mockConfig({ stt: { ...mockConfig().stt, whisperBin: "/nonexistent/path/to/whisper" } });
+  const result = await warmupWhisperLocal(config);
+  assert.equal(result, false);
 });
 
 test("/stt command shows status and updates session settings", async () => {
