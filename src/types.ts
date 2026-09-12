@@ -44,11 +44,14 @@ export interface ReplyKeyboardMarkup {
 }
 export type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup;
 
+export type MenuProfile = "daily" | "dev" | "mixed";
+
 export interface SessionSettings {
   model: string | null;
   effort: "low" | "medium" | "high";
   mode: "plan" | "accept-edits";
   sandbox: boolean;
+  menuProfile?: MenuProfile;
   agent?: string | null;
   project?: string | null;
   addDirs?: string[];
@@ -151,6 +154,7 @@ export interface AppConfig {
     maxMessageChars: number;
     progressMode: "full" | "compact" | "delete";
     verbose: "silent" | "compact" | "detailed";
+    menuProfile: MenuProfile;
     allowBotUpdate: boolean;
     autoInterrupt: boolean;
   };

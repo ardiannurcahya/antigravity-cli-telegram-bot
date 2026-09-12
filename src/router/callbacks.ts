@@ -1,6 +1,6 @@
 import type { AppContext } from "../context.js";
 import { isUuid, formatRelativeTime } from "../db.js";
-import { isEffort, isMode, isVerbose } from "../config.js";
+import { isEffort, isMode, isVerbose, isMenuProfile } from "../config.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor, saveSettings, type SettingsOutputFormat } from "../domain/settings.js";
@@ -9,6 +9,7 @@ import {
   backKeyboard,
   button,
   cliOptionsKeyboard,
+  menuProfileKeyboard,
   sttKeyboard,
   ttsKeyboard,
   verboseKeyboard,
@@ -242,6 +243,12 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       await context.telegram.editMessageText(chatId, messageId, `🔊 TTS mode set to <b>${value}</b>.`, ttsKeyboard(context, chatId), "HTML");
       return;
     }
+  }
+  if (key === "profile" && isMenuProfile(value)) {
+    settings.menuProfile = value;
+    await saveSettings(context, chatId, settings);
+    await showMain(context, chatId, messageId);
+    return;
   }
   if (key === "tts:voice") {
     settings.ttsVoice = value;

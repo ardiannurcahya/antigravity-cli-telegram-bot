@@ -1,4 +1,4 @@
-import { isEffort, isMode, isVerbose } from "../config.js";
+import { isEffort, isMode, isVerbose, isMenuProfile } from "../config.js";
 import { getActiveModels } from "../models.js";
 import type { AppContext } from "../context.js";
 import type { ChatId, SessionSettings } from "../types.js";
@@ -13,6 +13,7 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
   const config = context.config;
   const defaults: SessionSettings = {
     model: config.agy.model || null, effort: config.agy.effort, mode: config.agy.mode, sandbox: config.agy.sandbox,
+    menuProfile: config.telegram.menuProfile || "mixed",
     agent: config.agy.agent || null, project: config.agy.project || null, addDirs: [], continueSession: false,
     newProject: false, disableSlashCommands: false, jsonSchema: null, logFile: null, outputFormat: "stream-json",
     printTimeout: null, verbose: config.telegram.verbose || "detailed",
@@ -31,6 +32,7 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     effort: typeof stored.effort === "string" && isEffort(stored.effort) ? stored.effort : defaults.effort,
     mode: typeof stored.mode === "string" && isMode(stored.mode) ? stored.mode : defaults.mode,
     sandbox: typeof stored.sandbox === "boolean" ? stored.sandbox : defaults.sandbox,
+    menuProfile: typeof stored.menuProfile === "string" && isMenuProfile(stored.menuProfile) ? stored.menuProfile : defaults.menuProfile,
     agent: typeof stored.agent === "string" && stored.agent.trim() ? stored.agent.trim() : defaults.agent,
     project: typeof stored.project === "string" && stored.project.trim() ? stored.project.trim() : defaults.project,
     addDirs: Array.isArray(stored.addDirs) ? stored.addDirs.filter((value): value is string => typeof value === "string" && !!value.trim()).map((value) => value.trim()) : [],

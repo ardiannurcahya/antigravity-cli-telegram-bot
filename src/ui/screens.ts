@@ -5,9 +5,12 @@ import { createMainKeyboard } from "../keyboards.js";
 import {
   backKeyboard,
   cliOptionsKeyboard,
+  cliToolsKeyboard,
   effortKeyboard,
   mainInlineKeyboard,
+  menuProfileKeyboard,
   modeKeyboard,
+  modeSandboxKeyboard,
   modelKeyboard,
   outputFormatKeyboard,
   resumeKeyboard,
@@ -20,6 +23,7 @@ import {
   ttsModeKeyboard,
   ttsVoiceKeyboard,
   verboseKeyboard,
+  voiceSettingsKeyboard,
   workspaceKeyboard,
 } from "./inline-keyboards.js";
 import { resumeMessageText, sessionText, settingsText } from "./messages.js";
@@ -36,11 +40,12 @@ export function showMain(context: AppContext, chatId: ChatId, messageId?: number
 async function showMainInternal(context: AppContext, chatId: ChatId, messageId?: number): Promise<void> {
   const settings = settingsFor(context, chatId);
   const text = `AGY Telegram\n\n${settingsText(settings)}\n\nUse the two controls beside the input for Model and Mode. Use /menu for the full control panel.`;
+  const keyboard = mainInlineKeyboard(context, chatId);
   if (messageId) {
-    await context.telegram.editMessageText(chatId, messageId, text, mainInlineKeyboard());
+    await context.telegram.editMessageText(chatId, messageId, text, keyboard);
     await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(settings));
   } else {
-    await reply(context, chatId, text, mainInlineKeyboard());
+    await reply(context, chatId, text, keyboard);
     await context.telegram.sendMessage(chatId, "Model and mode controls are ready.", createMainKeyboard(settings));
   }
 }
@@ -120,6 +125,13 @@ export async function showMenu(context: AppContext, chatId: ChatId, messageId: n
   if (kind === "output") return context.telegram.editMessageText(chatId, messageId, "Select the output format used by future normal prompts:", outputFormatKeyboard(context, chatId));
   if (kind === "custom") return context.telegram.editMessageText(chatId, messageId, "Custom AGY command\n\nUse /agy followed by any non-interactive AGY arguments. Example:\n/agy --print \"Explain this project\" --output-format text\n\nInteractive TTY mode is unavailable through Telegram.", backKeyboard());
   if (kind === "plugins") return context.telegram.editMessageText(chatId, messageId, "Plugin commands\n\nRead-only:\n/agy plugin list\n\nMutating commands require /agy-confirm after the bot asks for confirmation:\n/agy plugin install NAME\n/agy plugin uninstall NAME\n/agy plugin enable NAME\n/agy plugin disable NAME\n/agy update", backKeyboard());
+  if (kind === "profile") {
+    const current = settingsFor(context, chatId).menuProfile || "mixed";
+    return context.telegram.editMessageText(chatId, messageId, `<b>Menu Profile</b>\n\nChoose the interface density and button layout for <code>/menu</code>:\n\n• <b>Mixed</b>: Balanced 4-row layout (default)\n• <b>Daily</b>: Minimalist 3-row layout for fast chat & voice\n• <b>Dev</b>: 5-row layout with Workspace, Modes, CLI & Context`, menuProfileKeyboard(current), "HTML");
+  }
+  if (kind === "modesandbox") return context.telegram.editMessageText(chatId, messageId, "Configure execution mode, sandbox, verbosity, and session details:", modeSandboxKeyboard(context, chatId));
+  if (kind === "clitools") return context.telegram.editMessageText(chatId, messageId, "CLI options, telemetry, and system maintenance:", cliToolsKeyboard(context, chatId));
+  if (kind === "voice") return context.telegram.editMessageText(chatId, messageId, "Configure Speech-to-Text (STT) and Text-to-Speech (TTS):", voiceSettingsKeyboard(context, chatId));
   if (kind === "stt") return context.telegram.editMessageText(chatId, messageId, "Select STT option to configure:", sttKeyboard(context, chatId));
   if (kind === "stt:provider") return context.telegram.editMessageText(chatId, messageId, "Select STT provider:", sttProviderKeyboard(context, chatId));
   if (kind === "stt:whisper") return context.telegram.editMessageText(chatId, messageId, "Select Whisper model:", sttWhisperModelKeyboard(context, chatId));

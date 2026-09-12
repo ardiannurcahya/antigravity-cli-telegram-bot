@@ -36,6 +36,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       maxMessageChars: positiveIntegerFrom(env, "TELEGRAM_MAX_MESSAGE_CHARS", 3900),
       progressMode: progressModeFrom(env),
       verbose: verboseFrom(env),
+      menuProfile: menuProfileFrom(env),
       allowBotUpdate: booleanFrom(env, "ALLOW_BOT_UPDATE", booleanFrom(env, "TELEGRAM_ALLOW_BOT_UPDATE", false)),
       autoInterrupt: booleanFrom(env, "TELEGRAM_AUTO_INTERRUPT", false),
     },
@@ -76,6 +77,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 export function isMode(value: string): value is "plan" | "accept-edits" { return value === "plan" || value === "accept-edits"; }
 export function isEffort(value: string): value is "low" | "medium" | "high" { return value === "low" || value === "medium" || value === "high"; }
 export function isVerbose(value: string): value is "silent" | "compact" | "detailed" { return value === "silent" || value === "compact" || value === "detailed"; }
+export function isMenuProfile(value: string): value is import("./types.js").MenuProfile {
+  return value === "daily" || value === "dev" || value === "mixed";
+}
 export function isTtsMode(value: string): value is "off" | "voice-only" | "voice-and-text" | "auto" {
   return value === "off" || value === "voice-only" || value === "voice-and-text" || value === "auto";
 }
@@ -127,6 +131,15 @@ function verboseFrom(env: Record<string, string | undefined>): "silent" | "compa
   if (["compact", "simple", "medium", "normal", "1line"].includes(raw)) return "compact";
   if (["detailed", "verbose", "full", "high", "all", "on"].includes(raw)) return "detailed";
   throw new Error(`TELEGRAM_VERBOSE must be 'silent', 'compact', or 'detailed' (received: ${raw})`);
+}
+
+function menuProfileFrom(env: Record<string, string | undefined>): import("./types.js").MenuProfile {
+  const raw = (env.MENU_PROFILE || env.TELEGRAM_MENU_PROFILE)?.trim().toLowerCase();
+  if (!raw) return "mixed";
+  if (["mixed", "default", "standard", "all"].includes(raw)) return "mixed";
+  if (["daily", "simple", "casual", "mobile"].includes(raw)) return "daily";
+  if (["dev", "developer", "project", "code"].includes(raw)) return "dev";
+  throw new Error(`MENU_PROFILE must be 'daily', 'dev', or 'mixed' (received: ${raw})`);
 }
 
 function sttProviderFrom(env: Record<string, string | undefined>): "agy" | "whisper-local" | "gemini" | "none" {
