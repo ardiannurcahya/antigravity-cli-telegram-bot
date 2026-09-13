@@ -177,8 +177,7 @@ export function cliToolsKeyboard(context: AppContext, chatId: ChatId): InlineKey
   return {
     inline_keyboard: [
       [button("🛠️ CLI Options", "menu:cli"), button("🧠 Active Context", "action:context")],
-      [button("📊 Usage / Quota", "action:usage"), button("🧩 Plugins", "menu:plugins")],
-      [button("AGY Models", "cli:models"), button("AGY Agents", "cli:agents")],
+      [button("AGY Agents", "cli:agents"), button("🧩 Plugins", "menu:plugins")],
       [button("Changelog", "cli:changelog"), button("CLI Help", "cli:help")],
       [button("CLI Version", "cli:version"), button("Custom /agy", "menu:custom")],
       [button("Update CLI", "cli:update"), button("🔄 Update Bot", "action:update_bot")],

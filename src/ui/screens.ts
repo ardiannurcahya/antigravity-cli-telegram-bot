@@ -39,14 +39,12 @@ export function showMain(context: AppContext, chatId: ChatId, messageId?: number
 
 async function showMainInternal(context: AppContext, chatId: ChatId, messageId?: number): Promise<void> {
   const settings = settingsFor(context, chatId);
-  const text = `AGY Telegram\n\n${settingsText(settings)}\n\nUse the two controls beside the input for Model and Mode. Use /menu for the full control panel.`;
+  const text = "⚙️ AGY Control Panel";
   const keyboard = mainInlineKeyboard(context, chatId);
   if (messageId) {
     await context.telegram.editMessageText(chatId, messageId, text, keyboard);
-    await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(settings));
   } else {
     await reply(context, chatId, text, keyboard);
-    await context.telegram.sendMessage(chatId, "Model and mode controls are ready.", createMainKeyboard(settings));
   }
 }
 

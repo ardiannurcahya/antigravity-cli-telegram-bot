@@ -79,13 +79,11 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       const isTopic = Boolean(callback.message?.message_thread_id) || String(chatId).includes(":");
       await context.state.resetSession(chatId, true, isTopic);
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
     }
     case "cancel": {
       const result = context.queue.cancelForChat(chatId);
       await context.telegram.editMessageText(chatId, messageId, `Cancelled: ${result.removed} queued, active=${result.activeCancelled ? "yes" : "no"}.`, { inline_keyboard: [] });
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
     }
     case "set":
@@ -133,7 +131,6 @@ async function resumeConversation(context: AppContext, chatId: import("../types.
       { inline_keyboard: [] }
     ).catch(() => undefined);
   }
-  await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
 }
 
 async function handleCliAction(context: AppContext, chatId: import("../types.js").ChatId, messageId: number, command: string): Promise<void> {
@@ -161,7 +158,6 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     const outcome = await selectModel(context, chatId, value);
     if (outcome) {
       await context.telegram.editMessageText(chatId, messageId, outcome.text, outcome.defaultOfferKeyboard, "HTML");
-      await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(outcome.settings));
       return;
     }
   }
@@ -182,7 +178,6 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
         { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
         "HTML"
       );
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
       return;
     }
     const resolution = resolveWorkspacePath(value, context.config.agy.projectsRoot, context.config.agy.workspace);
@@ -206,7 +201,6 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
       "HTML"
     );
-    await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
     return;
   }
   if (key === "stt:provider") {

@@ -367,11 +367,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const shouldSendText = ttsMode !== "voice-only" || !shouldSendVoice;
 
     if (shouldSendText) {
-      if (responseBody.length > context.config.telegram.maxMessageChars * 2) {
-        await context.telegram.sendDocument(job.chatId, `agy-${job.id}.md`, responseBody);
-      } else {
-        await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
-      }
+      await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
     }
 
     if (shouldSendVoice && result.text) {

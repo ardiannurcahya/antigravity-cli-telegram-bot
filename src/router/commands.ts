@@ -101,7 +101,6 @@ command("/models", "/model")(async ({ context, chatId, args }) => {
     return;
   }
   await replyWithHtml(context, chatId, outcome.text, outcome.defaultOfferKeyboard);
-  await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(outcome.settings));
 });
 
 command("/effort")(async ({ context, chatId, args }) => {
