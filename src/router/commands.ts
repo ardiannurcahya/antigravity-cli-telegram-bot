@@ -23,7 +23,7 @@ import { enqueueJob } from "../usecases/enqueue.js";
 import { refreshModels, selectModel } from "../usecases/model-selection.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
-import { isWhisperInstalled } from "../stt/stt-service.js";
+import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
 import { resolveWorkspacePath } from "../domain/workspace.js";
@@ -101,7 +101,6 @@ command("/models", "/model")(async ({ context, chatId, args }) => {
     return;
   }
   await replyWithHtml(context, chatId, outcome.text, outcome.defaultOfferKeyboard);
-  await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(outcome.settings));
 });
 
 command("/effort")(async ({ context, chatId, args }) => {
@@ -381,6 +380,9 @@ command("/stt")(async ({ context, chatId, args }) => {
       return;
     }
     await saveSettings(context, chatId, currentSettings);
+    if (currentSettings.sttProvider === "whisper-local") {
+      void warmupWhisperLocal(context.config);
+    }
     let replyMsg = `🎙️ STT provider set to <code>${currentSettings.sttProvider}</code>.`;
     if (currentSettings.sttProvider === "whisper-local" && !isWhisperInstalled(context.config.stt.whisperBin)) {
       replyMsg += `\n\n⚠️ <i>Hinweis: Das Binary <code>${escapeHtml(context.config.stt.whisperBin || "whisper")}</code> ist im System nicht auffindbar. Bitte Whisper installieren oder Konfiguration prüfen.</i>`;

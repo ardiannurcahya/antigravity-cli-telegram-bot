@@ -120,6 +120,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       undefined,
       "HTML"
     );
+    void context.telegram.sendChatAction(job.chatId).catch(() => undefined);
     const startedAt = Date.now();
     const recentSteps: string[] = [];
 
@@ -169,6 +170,15 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       if (verbose === "silent") return;
 
       const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0);
+
+      if (verbose === "compact") {
+        const latestStep = recentSteps.length > 0 ? recentSteps[recentSteps.length - 1] : "";
+        const compactStatus = latestStep ? ` · ${latestStep}` : "";
+        pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${modelLabel(settings.model)}${compactStatus})`;
+        void flushProgress();
+        return;
+      }
+
       const stepsDisplay = recentSteps.map((s, idx) => {
         const isLatest = idx === recentSteps.length - 1;
         return `${isLatest ? "➜" : "✓"} ${s}`;
@@ -357,11 +367,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const shouldSendText = ttsMode !== "voice-only" || !shouldSendVoice;
 
     if (shouldSendText) {
-      if (responseBody.length > context.config.telegram.maxMessageChars * 2) {
-        await context.telegram.sendDocument(job.chatId, `agy-${job.id}.md`, responseBody);
-      } else {
-        await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
-      }
+      await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
     }
 
     if (shouldSendVoice && result.text) {

@@ -40,10 +40,9 @@ test("/start and /menu render the main panel with exact copy", async () => {
   try {
     await handleCommand(ctx, textUpdate(777, "").message!, "/start", []);
     const texts = harness.telegram.sentTexts();
-    assert.equal(texts.length, 2);
-    assert.match(texts[0], /^AGY Telegram\n\nModel: AGY default\nEffort: high\nMode: plan\nVerbose: detailed\n/);
-    assert.equal(texts[1], "Model and mode controls are ready.");
-    assert.equal(harness.telegram.lastPayload("sendMessage")?.text, texts[1]);
+    assert.equal(texts.length, 1);
+    assert.equal(texts[0], "⚙️ AGY Control Panel");
+    assert.equal(harness.telegram.lastPayload("sendMessage")?.text, texts[0]);
   } finally {
     harness.cleanup();
   }
@@ -209,10 +208,9 @@ test("callbacks: set:model persists model+effort and offers permanent default", 
     assert.deepEqual(JSON.parse(JSON.stringify((edit?.reply_markup as { inline_keyboard: string[][] }).inline_keyboard)), [
       [{ text: "⭐ Yes, set as Default", callback_data: "action:setdefault" }, { text: "👌 Only this session", callback_data: "menu:main" }],
     ]);
-    assert.equal(harness.telegram.sentTexts().at(-1), "Controls updated.");
 
     await handleCallback(ctx, callbackUpdate("set:model:not-a-real-model", 777, 43));
-    assert.match(String(harness.telegram.editedTexts().at(-1)), /^AGY Telegram\n/);
+    assert.equal(String(harness.telegram.editedTexts().at(-1)), "⚙️ AGY Control Panel");
   } finally {
     harness.cleanup();
   }
@@ -237,7 +235,6 @@ test("callbacks: toggle, action:new, action:cancel, resume validation, menu rout
     assert.equal(ctx.state.session(777)?.settings?.continueSession, false);
     assert.equal(ctx.state.session(777)?.settings?.newProject, false);
     assert.match(String(harness.telegram.editedTexts().at(-1)), /^✨ <b>New AGY conversation started\.<\/b>/);
-    assert.equal(harness.telegram.sentTexts().at(-1), "Controls ready.");
 
     await handleCallback(ctx, callbackUpdate("action:cancel"));
     assert.equal(harness.telegram.editedTexts().at(-1), "Cancelled: 0 queued, active=no.");
@@ -654,9 +651,8 @@ test("/help streams CLI help through a fresh loading message", async () => {
   try {
     await handleCommand(ctx, textUpdate(777, "").message!, "/help", []);
     const texts = harness.telegram.sentTexts();
-    assert.match(texts[0], /^AGY Telegram\n/);
-    assert.equal(texts[1], "Model and mode controls are ready.");
-    assert.equal(texts[2], "Loading AGY CLI help...");
+    assert.equal(texts[0], "⚙️ AGY Control Panel");
+    assert.equal(texts[1], "Loading AGY CLI help...");
     assert.equal(harness.telegram.editedTexts().at(-1), "Running agy --help...");
   } finally {
     harness.cleanup();

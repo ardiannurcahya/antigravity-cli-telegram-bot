@@ -1,6 +1,6 @@
 import type { AppContext } from "../context.js";
 import { isUuid, formatRelativeTime } from "../db.js";
-import { isEffort, isMode, isVerbose } from "../config.js";
+import { isEffort, isMode, isVerbose, isMenuProfile } from "../config.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor, saveSettings, type SettingsOutputFormat } from "../domain/settings.js";
@@ -9,6 +9,7 @@ import {
   backKeyboard,
   button,
   cliOptionsKeyboard,
+  menuProfileKeyboard,
   sttKeyboard,
   ttsKeyboard,
   verboseKeyboard,
@@ -22,7 +23,7 @@ import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import type { TelegramCallbackQuery } from "../types.js";
-import { isWhisperInstalled } from "../stt/stt-service.js";
+import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
 import { authorizedCallback } from "./auth.js";
 import { parseCallbackAction } from "./callback-parser.js";
 
@@ -78,13 +79,11 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       const isTopic = Boolean(callback.message?.message_thread_id) || String(chatId).includes(":");
       await context.state.resetSession(chatId, true, isTopic);
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
     }
     case "cancel": {
       const result = context.queue.cancelForChat(chatId);
       await context.telegram.editMessageText(chatId, messageId, `Cancelled: ${result.removed} queued, active=${result.activeCancelled ? "yes" : "no"}.`, { inline_keyboard: [] });
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settingsFor(context, chatId)));
       return;
     }
     case "set":
@@ -132,7 +131,6 @@ async function resumeConversation(context: AppContext, chatId: import("../types.
       { inline_keyboard: [] }
     ).catch(() => undefined);
   }
-  await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
 }
 
 async function handleCliAction(context: AppContext, chatId: import("../types.js").ChatId, messageId: number, command: string): Promise<void> {
@@ -160,7 +158,6 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     const outcome = await selectModel(context, chatId, value);
     if (outcome) {
       await context.telegram.editMessageText(chatId, messageId, outcome.text, outcome.defaultOfferKeyboard, "HTML");
-      await context.telegram.sendMessage(chatId, "Controls updated.", createMainKeyboard(outcome.settings));
       return;
     }
   }
@@ -181,7 +178,6 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
         { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
         "HTML"
       );
-      await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
       return;
     }
     const resolution = resolveWorkspacePath(value, context.config.agy.projectsRoot, context.config.agy.workspace);
@@ -205,13 +201,15 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] },
       "HTML"
     );
-    await context.telegram.sendMessage(chatId, "Controls ready.", createMainKeyboard(settings));
     return;
   }
   if (key === "stt:provider") {
     if (value === "whisper-local" || value === "gemini" || value === "agy" || value === "none") {
       settings.sttProvider = value;
       await saveSettings(context, chatId, settings);
+      if (value === "whisper-local") {
+        void warmupWhisperLocal(context.config);
+      }
       let text = `🎙️ STT provider set to <b>${value}</b>.`;
       if (value === "whisper-local" && !isWhisperInstalled(context.config.stt.whisperBin)) {
         text += `\n\n⚠️ <i>Hinweis: Das Binary <code>${escapeHtml(context.config.stt.whisperBin || "whisper")}</code> ist im System nicht auffindbar. Bitte Whisper installieren oder Konfiguration prüfen.</i>`;
@@ -239,6 +237,12 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
       await context.telegram.editMessageText(chatId, messageId, `🔊 TTS mode set to <b>${value}</b>.`, ttsKeyboard(context, chatId), "HTML");
       return;
     }
+  }
+  if (key === "profile" && isMenuProfile(value)) {
+    settings.menuProfile = value;
+    await saveSettings(context, chatId, settings);
+    await showMain(context, chatId, messageId);
+    return;
   }
   if (key === "tts:voice") {
     settings.ttsVoice = value;

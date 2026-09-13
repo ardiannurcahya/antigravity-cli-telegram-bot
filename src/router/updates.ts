@@ -270,11 +270,16 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       await reply(context, sessionKey, "Select a model:", modelKeyboard(context, sessionKey));
       return;
     }
+    if (buttonText === "📋 Menu" || buttonText === "Menu") {
+      await showMain(context, sessionKey);
+      return;
+    }
     if (buttonText === "📊 Quota" || buttonText === "📊 Usage / Quota" || buttonText === "📊 Usage") {
       enqueueJob(context, sessionKey, { kind: "usage" });
       return;
     }
     if (text.startsWith("/")) { await reply(context, sessionKey, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, sessionKey))); return; }
+    void context.telegram.sendChatAction(sessionKey, "typing").catch(() => undefined);
     enqueueJob(context, sessionKey, {
       prompt: text,
       kind: "prompt",

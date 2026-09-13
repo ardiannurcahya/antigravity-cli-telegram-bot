@@ -93,3 +93,11 @@ test("loads default STT provider as none and TTS mode as off", () => {
   assert.equal(config.stt.provider, "none");
   assert.equal(config.tts?.mode, "off");
 });
+
+test("supports configurable menuProfile with mixed default", () => {
+  assert.equal(loadConfig(base).telegram.menuProfile, "mixed");
+  assert.equal(loadConfig({ ...base, MENU_PROFILE: "daily" }).telegram.menuProfile, "daily");
+  assert.equal(loadConfig({ ...base, MENU_PROFILE: "dev" }).telegram.menuProfile, "dev");
+  assert.equal(loadConfig({ ...base, MENU_PROFILE: "mixed" }).telegram.menuProfile, "mixed");
+  assert.throws(() => loadConfig({ ...base, MENU_PROFILE: "unknown" }), /MENU_PROFILE must be/);
+});

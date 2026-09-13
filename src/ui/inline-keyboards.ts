@@ -105,22 +105,96 @@ export function workspaceKeyboard(context: AppContext, chatId: ChatId, page = 0)
   return { inline_keyboard: rows };
 }
 
-export function mainInlineKeyboard(): InlineKeyboardMarkup {
+export function profileLabel(profile: import("../types.js").MenuProfile): string {
+  if (profile === "daily") return "Daily";
+  if (profile === "dev") return "Dev";
+  return "Mixed";
+}
+
+export function menuProfileKeyboard(currentProfile: import("../types.js").MenuProfile): InlineKeyboardMarkup {
+  const profiles: Array<{ id: import("../types.js").MenuProfile; label: string; desc: string }> = [
+    { id: "mixed", label: "Mixed", desc: "Balanced (default)" },
+    { id: "daily", label: "Daily", desc: "Minimalist & Voice" },
+    { id: "dev", label: "Dev", desc: "Workspace & Context" },
+  ];
+  const rows: InlineButton[][] = profiles.map((p) => [
+    button(`${p.id === currentProfile ? "✅ " : ""}${p.label} - ${p.desc}`, `set:profile:${p.id}`),
+  ]);
+  rows.push([button("‹ Back to Menu", "menu:main")]);
+  return { inline_keyboard: rows };
+}
+
+export function mainInlineKeyboard(context?: AppContext, chatId?: ChatId): InlineKeyboardMarkup {
+  const profile = context && chatId ? (settingsFor(context, chatId).menuProfile || "mixed") : "mixed";
+  const profileBtn = button(`🔄 Profile: ${profileLabel(profile)} ▾`, "menu:profile");
+  const closeBtn = button("❌ Close", "action:cancel");
+
+  if (profile === "daily") {
+    return {
+      inline_keyboard: [
+        [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
+        [button("🎙️ Voice Settings", "menu:voice"), button("📂 History / Resume", "menu:resume")],
+        [profileBtn, closeBtn],
+      ],
+    };
+  }
+
+  if (profile === "dev") {
+    return {
+      inline_keyboard: [
+        [button("📁 Workspace", "menu:workspace"), button("📂 Resume Session", "menu:resume")],
+        [button("⚙️ Mode (Plan/Edit)", "menu:mode"), button("🛡️ Sandbox", "menu:sandbox")],
+        [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
+        [button("🛠️ CLI Options", "menu:cli"), button("🧠 Active Context", "action:context")],
+        [profileBtn, closeBtn],
+      ],
+    };
+  }
+
+  // Mixed / Balanced Profile (Default)
   return {
     inline_keyboard: [
-      [button("Models", "menu:models"), button("Effort", "menu:effort")],
-      [button("Mode", "menu:mode"), button("Sandbox", "menu:sandbox")],
-      [button("Workspace", "menu:workspace"), button("Resume session", "menu:resume")],
-      [button("Verbose", "menu:verbose"), button("Session", "menu:session")],
-      [button("Usage / Quota", "action:usage"), button("Active Context", "action:context")],
-      [button("CLI options", "menu:cli"), button("AGY models", "cli:models")],
-      [button("AGY agents", "cli:agents"), button("Plugins", "cli:plugins")],
-      [button("Changelog", "cli:changelog"), button("CLI help", "cli:help")],
-      [button("CLI version", "cli:version"), button("Custom /agy", "menu:custom")],
-      [button("Plugin actions", "menu:plugins"), button("Update CLI", "cli:update")],
-      [button("🎙️ STT", "menu:stt"), button("🔊 TTS", "menu:tts")],
+      [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
+      [button("🎙️ Voice Settings", "menu:voice"), button("📁 Workspace", "menu:workspace")],
+      [button("⚙️ Mode & Sandbox", "menu:modesandbox"), button("🛠️ CLI & Tools", "menu:clitools")],
+      [profileBtn, closeBtn],
+    ],
+  };
+}
+
+export function modeSandboxKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  return {
+    inline_keyboard: [
+      [button(`⚙️ Mode: ${settings.mode}`, "menu:mode"), button(`🛡️ Sandbox: ${settings.sandbox ? "On" : "Off"}`, "menu:sandbox")],
+      [button(`Verbose: ${settings.verbose || "detailed"}`, "menu:verbose"), button("Session Info", "menu:session")],
+      [button("‹ Back", "menu:main")],
+    ],
+  };
+}
+
+export function cliToolsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [button("🛠️ CLI Options", "menu:cli"), button("🧠 Active Context", "action:context")],
+      [button("AGY Agents", "cli:agents"), button("🧩 Plugins", "menu:plugins")],
+      [button("Changelog", "cli:changelog"), button("CLI Help", "cli:help")],
+      [button("CLI Version", "cli:version"), button("Custom /agy", "menu:custom")],
+      [button("Update CLI", "cli:update"), button("🔄 Update Bot", "action:update_bot")],
       [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
-      [button("🔄 Update Bot", "action:update_bot"), button("Cancel", "action:cancel")],
+      [button("‹ Back", "menu:main")],
+    ],
+  };
+}
+
+export function voiceSettingsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const settings = settingsFor(context, chatId);
+  const stt = settings.sttProvider || context.config.stt.provider || "none";
+  const tts = settings.ttsMode || context.config.tts?.mode || "off";
+  return {
+    inline_keyboard: [
+      [button(`🎙️ STT (${stt})`, "menu:stt"), button(`🔊 TTS (${tts})`, "menu:tts")],
+      [button("‹ Back", "menu:main")],
     ],
   };
 }
@@ -135,7 +209,7 @@ export function cliOptionsKeyboard(context: AppContext, chatId: ChatId): InlineK
       [button("Add directory", "cli:add-dir"), button("JSON schema", "cli:json-schema")],
       [button("Log file", "cli:log-file"), button("Print timeout", "cli:print-timeout")],
       [button("Conversation ID", "cli:conversation"), button("Prompt flags", "cli:prompt")],
-      [button("‹ Back", "menu:main")],
+      [button("‹ Back", "menu:clitools")],
     ],
   };
 }

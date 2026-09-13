@@ -24,6 +24,8 @@ test("callback parser decodes every wire format the keyboards emit", () => {
   assert.deepEqual(parseCallbackAction("toggle:disable-slash"), { kind: "toggle", option: "disable-slash" });
   assert.deepEqual(parseCallbackAction("set:model:gemini-3.7-flash-high"), { kind: "set", key: "model", value: "gemini-3.7-flash-high" });
   assert.deepEqual(parseCallbackAction("set:sandbox:off"), { kind: "set", key: "sandbox", value: "off" });
+  assert.deepEqual(parseCallbackAction("menu:profile"), { kind: "menu", menu: "profile", page: 0 });
+  assert.deepEqual(parseCallbackAction("set:profile:dev"), { kind: "set", key: "profile", value: "dev" });
 });
 
 test("callback parser rejects unknown payloads like the legacy fall-through", () => {
