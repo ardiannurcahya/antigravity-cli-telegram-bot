@@ -9,6 +9,7 @@ import { createMainKeyboard } from "../keyboards.js";
 import { reply, replyWithHtml, replyWithFormattedResponse } from "../ui/reply.js";
 import { escapeHtml } from "../telegram.js";
 import { getActiveModels } from "../models.js";
+import { refreshActiveMenu } from "../ui/screens.js";
 
 function createCompactionProgressReporter(
   context: AppContext,
@@ -76,6 +77,39 @@ function createCompactionProgressReporter(
   };
 }
 
+export interface CompactionSummary {
+  activeGoal: string;
+  bulletPoints: string[];
+}
+
+export function extractCompactionSummary(snapshotText: string): CompactionSummary {
+  const lines = snapshotText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let activeGoal = "";
+  const bulletPoints: string[] = [];
+
+  for (const line of lines) {
+    const cleanLine = line.replace(/^[#*-\s]+/, "").trim();
+    const goalMatch = cleanLine.match(/^(?:Active goal|Goal|Objectif(?: principal)?|Objective)\s*:\s*(.+)$/i);
+    if (goalMatch && !activeGoal) {
+      activeGoal = goalMatch[1].trim();
+      continue;
+    }
+    if (/^[•*-\d.]\s+/.test(line) || /^(?:Status|Next|Décisions|Prochaines étapes|Modified)\s*:/i.test(cleanLine)) {
+      bulletPoints.push(cleanLine.replace(/^[•*-\s]+/, ""));
+    }
+  }
+
+  if (!activeGoal) {
+    const nonPreamble = lines.find((l) => !/^(?:voici|here is|je vais|synthèse)/i.test(l.replace(/^[#*-\s]+/, "")));
+    activeGoal = (nonPreamble || lines[0] || "Compacted Task").replace(/^[#*-\s]+/, "").slice(0, 80).trim();
+  }
+
+  return {
+    activeGoal,
+    bulletPoints: bulletPoints.slice(0, 3),
+  };
+}
+
 /**
  * Executes orchestrator-level 3-phase context compaction:
  * 1. Handover Snapshot Synthesis (in-session extraction)
@@ -126,12 +160,16 @@ export async function runCompactionJob(
     // Phase 1: Handover Snapshot Synthesis
     const focusArea = job.prompt?.trim();
     const synthesisPrompt = [
-      "Synthesize our active task state for a handover snapshot:",
-      "1. Current Objective & Scope",
-      "2. Modified Files & Key Decisions made",
-      "3. Pending Next Steps",
-      focusArea ? `\nFocus area requested: ${focusArea}` : "",
-      "\nFormat concisely in Markdown. Discard historical intermediate tool outputs and debugging logs.",
+      "Synthesize our active task state for a handover snapshot in strictly concise bullet points.",
+      "Do NOT include any conversational intro, greetings, or conclusions.",
+      focusArea ? `Focus area requested: ${focusArea}` : "",
+      "",
+      "Format exactly as follows:",
+      "Goal: <One clear sentence stating the primary objective>",
+      "• Status: <1-2 concise bullet points on what was accomplished and key decisions>",
+      "• Next: <1-2 concise bullet points on pending next steps>",
+      "",
+      "Discard historical intermediate tool outputs and debugging logs.",
     ].filter(Boolean).join("\n");
 
     let snapshotResult: AgyResult;
@@ -289,10 +327,8 @@ export async function runCompactionJob(
       return;
     }
 
-    const initialTitle = (snapshotText.split(/\r?\n/).find((l) => l.trim().length > 0) || "Compacted Task")
-      .replace(/^[#*\s-]+/, "")
-      .slice(0, 60)
-      .trim();
+    const summary = extractCompactionSummary(snapshotText);
+    const initialTitle = summary.activeGoal;
 
     const lastRun = {
       model: rehydrationResult.model || freshSettings.model || null,
@@ -304,12 +340,14 @@ export async function runCompactionJob(
       completedAt: new Date().toISOString(),
     };
 
-    const afterTokensCount = rehydrationResult.usage?.input_tokens ?? rehydrationResult.usage?.total_tokens;
+    const afterTokensCount = rehydrationResult.activeInputTokens ?? rehydrationResult.usage?.input_tokens ?? rehydrationResult.usage?.total_tokens;
     const afterTokensStr = formatTokenCount(afterTokensCount);
     const maxTokens = getActiveModels().find((m) => m.id === (rehydrationResult.model || freshSettings.model))?.maxContextWindow || 1_000_000;
     const newPercentage = afterTokensCount ? Math.min(100, Math.round((afterTokensCount / maxTokens) * 100)) : undefined;
 
     // Atomic commit: reset previous session artifacts and activate new conversation
+    const previousMenuMessageId = session.lastMenuMessageId;
+    const previousMenuScreen = session.activeMenuScreen;
     await cleanupSessionTempFiles(context.config.tempDir, job.chatId);
     await context.state.resetSession(job.chatId, false);
     await context.state.setSession(job.chatId, {
@@ -322,8 +360,11 @@ export async function runCompactionJob(
       usageTotals: rehydrationResult.usage,
       contextTokens: afterTokensStr || undefined,
       contextPercentage: newPercentage,
+      lastMenuMessageId: previousMenuMessageId,
+      activeMenuScreen: previousMenuScreen,
       updatedAt: new Date().toISOString(),
     });
+    await refreshActiveMenu(context, job.chatId);
 
     context.convDb.upsertConversation({
       conversation_id: newConvId,
@@ -336,11 +377,14 @@ export async function runCompactionJob(
     });
 
     const reductionText = beforeTokens && afterTokensStr ? `from ~${beforeTokens} to ${afterTokensStr} tokens` : "";
+    const bulletSection = summary.bulletPoints.map((b) => `• <i>${escapeHtml(b)}</i>`).join("\n");
     const header = [
       "🗜️ <b>Context compacted successfully</b>",
       reductionText ? `Reduced ${reductionText}` : "",
       "",
       `📌 <b>Active goal:</b> <i>${escapeHtml(initialTitle)}</i>`,
+      bulletSection || "",
+      "",
       "➜ Fresh session initialized with full model attention.",
     ].filter(Boolean).join("\n");
 

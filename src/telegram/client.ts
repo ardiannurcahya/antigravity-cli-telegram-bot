@@ -239,6 +239,27 @@ export class TelegramClient {
       throw error;
     }
   }
+  public async editMessageReplyMarkup(
+    chatId: ChatId,
+    messageId: number,
+    replyMarkup?: InlineKeyboardMarkup
+  ): Promise<void> {
+    const target = parseChatTarget(chatId);
+    try {
+      await this.call("editMessageReplyMarkup", {
+        chat_id: target.chatId,
+        message_id: messageId,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }, undefined, 0);
+    } catch (error) {
+      if (error instanceof Error && (
+        error.message.includes("message is not modified") ||
+        error.message.includes("Too Many Requests") ||
+        error.message.includes("message to edit not found")
+      )) return;
+      // Do not throw on cosmetic menu updates
+    }
+  }
   public async deleteMessage(chatId: ChatId, messageId: number): Promise<boolean> {
     const target = parseChatTarget(chatId);
     try {

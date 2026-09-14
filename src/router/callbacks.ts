@@ -86,6 +86,7 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
     }
     case "cancel": {
       const result = context.queue.cancelForChat(chatId);
+      await context.state.setSession(chatId, { lastMenuMessageId: undefined, activeMenuScreen: undefined });
       await context.telegram.editMessageText(chatId, messageId, `Cancelled: ${result.removed} queued, active=${result.activeCancelled ? "yes" : "no"}.`, { inline_keyboard: [] });
       return;
     }

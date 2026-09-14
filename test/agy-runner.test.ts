@@ -211,6 +211,28 @@ test("isolates intermediate waiting turns followed by system messages without in
   assert.equal(parsed.toolCalls, 1);
 });
 
+test("parseStreamOutput preserves activeInputTokens from the last LLM turn instead of cumulative usage", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-tokens" }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 1, step_type: "tool", usage: { input_tokens: 15000 } } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 2, step_type: "tool", usage: { input_tokens: 18000 } } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 3, step_type: "agent_response", text_delta: "Done", usage: { input_tokens: 21500 } } }),
+    JSON.stringify({
+      event: "result",
+      result: {
+        conversation_id: "conv-tokens",
+        status: "SUCCESS",
+        response: "Done",
+        usage: { input_tokens: 54500, total_tokens: 56000 },
+      },
+    }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.usage?.input_tokens, 54500, "Cumulative usage preserved on result");
+  assert.equal(parsed.activeInputTokens, 21500, "Active context reflects the last LLM turn");
+});
+
+
 
 
 

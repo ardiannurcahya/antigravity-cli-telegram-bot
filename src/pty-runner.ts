@@ -306,14 +306,36 @@ export function parseContext(rawOutput: string): string {
   return result.join("\n");
 }
 
+export function parseTokenValue(raw: string): number | null {
+  const match = raw.trim().match(/^([\d.]+)\s*([kKmM]?)$/);
+  if (!match) return null;
+  const val = parseFloat(match[1]);
+  if (Number.isNaN(val)) return null;
+  const unit = match[2].toUpperCase();
+  if (unit === "M") return val * 1_000_000;
+  if (unit === "K") return val * 1_000;
+  return val;
+}
+
 export function parseContextMetrics(rawOutput: string): { tokens?: string; percentage?: number } {
   try {
     const text = cleanAnsi(rawOutput);
-    const tokenMatch = text.match(/([\d.]+[kKmM]?)\s*\/\s*[\d.]+[kKmM]?\s*tokens/i);
-    const pctMatch = text.match(/\(\s*([\d.]+)\s*%\s*\)/);
+    const tokenMatch = text.match(/([\d.]+[kKmM]?)\s*\/\s*([\d.]+[kKmM]?)\s*tokens/i);
     const result: { tokens?: string; percentage?: number } = {};
-    if (tokenMatch) result.tokens = tokenMatch[1].trim();
-    if (pctMatch) result.percentage = Math.round(parseFloat(pctMatch[1]));
+    if (tokenMatch) {
+      result.tokens = tokenMatch[1].trim();
+      const current = parseTokenValue(tokenMatch[1]);
+      const max = parseTokenValue(tokenMatch[2]);
+      if (current !== null && max !== null && max > 0) {
+        result.percentage = Math.min(100, Math.round((current / max) * 100));
+      }
+    }
+    // Prefer explicit percentage strictly associated with the total context line (e.g. "· 146.3k/1.0M tokens\n□ (14.0%)")
+    const totalLinePct = text.match(/[\d.]+[kKmM]?\s*\/\s*[\d.]+[kKmM]?\s*tokens[^\n]*\(\s*([\d.]+)\s*%\s*\)/i)
+      || text.match(/[\d.]+[kKmM]?\s*\/\s*[\d.]+[kKmM]?\s*tokens[^\n]*\n\s*[□◉⛁⊠\s]*\(\s*([\d.]+)\s*%\s*\)/i);
+    if (totalLinePct) {
+      result.percentage = Math.round(parseFloat(totalLinePct[1]));
+    }
     return result;
   } catch {
     return {};

@@ -65,6 +65,10 @@ export class FakeTelegramClient {
     this.recordAndMaybeFail("editMessageText", { chat_id: chatId, message_id: messageId, text, reply_markup: replyMarkup, parse_mode: parseMode });
   }
 
+  public async editMessageReplyMarkup(chatId: ChatId, messageId: number, replyMarkup?: InlineKeyboardMarkup): Promise<void> {
+    this.recordAndMaybeFail("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup });
+  }
+
   public async deleteMessage(chatId: ChatId, messageId: number): Promise<boolean> {
     this.recordAndMaybeFail("deleteMessage", { chat_id: chatId, message_id: messageId });
     return true;

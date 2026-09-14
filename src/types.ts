@@ -101,6 +101,8 @@ export interface SessionState {
   usageTotals?: Usage | null;
   contextTokens?: string;
   contextPercentage?: number;
+  lastMenuMessageId?: number;
+  activeMenuScreen?: string;
   updatedAt?: string;
 }
 
@@ -201,6 +203,7 @@ export interface AgyResult {
   conversationId: string | null;
   model: string | null;
   usage: Usage | null;
+  activeInputTokens?: number | null;
   durationMs: number | null;
   numTurns: number | null;
   toolCalls: number;

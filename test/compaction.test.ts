@@ -434,3 +434,81 @@ if (prompt.includes("Synthesize our active task state")) {
   harness.cleanup();
 });
 
+test("refreshActiveMenu updates open control panel inline keyboard in place", async () => {
+  const harness = createHarness();
+  const chatId = 1007;
+
+  // Simulate user opening the menu in dev profile
+  await harness.state.setSession(chatId, {
+    settings: { menuProfile: "dev" },
+    lastMenuMessageId: 8888,
+    activeMenuScreen: "main",
+    contextTokens: "10k",
+    contextPercentage: 1,
+  });
+
+  const { refreshActiveMenu } = await import("../src/ui/screens.js");
+  await refreshActiveMenu(harness as any, chatId);
+
+  const editCalls = harness.telegram.calls.filter((c) => c.method === "editMessageReplyMarkup");
+  assert.equal(editCalls.length, 1);
+  assert.equal(editCalls[0].payload.message_id, 8888);
+  const markup = editCalls[0].payload.reply_markup as any;
+  const contextBtn = markup.inline_keyboard.flat().find((b: any) => b.callback_data === "action:context");
+  assert.equal(contextBtn?.text, "🧠 10k (1%)");
+
+  harness.cleanup();
+});
+
+test("refreshActiveMenu updates clitools screen inline keyboard in place", async () => {
+  const harness = createHarness();
+  const chatId = 1008;
+
+  // Simulate user opening the clitools submenu
+  await harness.state.setSession(chatId, {
+    lastMenuMessageId: 9999,
+    activeMenuScreen: "clitools",
+    contextTokens: "12k",
+    contextPercentage: 2,
+  });
+
+  const { refreshActiveMenu } = await import("../src/ui/screens.js");
+  await refreshActiveMenu(harness as any, chatId);
+
+  const editCalls = harness.telegram.calls.filter((c) => c.method === "editMessageReplyMarkup");
+  assert.equal(editCalls.length, 1);
+  assert.equal(editCalls[0].payload.message_id, 9999);
+  const markup = editCalls[0].payload.reply_markup as any;
+  const contextBtn = markup.inline_keyboard.flat().find((b: any) => b.callback_data === "action:context");
+  assert.equal(contextBtn?.text, "🧠 12k (2%)");
+
+  harness.cleanup();
+});
+
+test("extractCompactionSummary extracts structured goal and bullet points cleanly", async () => {
+  const { extractCompactionSummary } = await import("../src/usecases/compaction.js");
+
+  const structuredSnapshot = `Goal: Synchronize live active context metrics
+• Status: Validated PTY parser with real token counts
+• Next: Implement silent post-response probe
+`;
+  const res1 = extractCompactionSummary(structuredSnapshot);
+  assert.equal(res1.activeGoal, "Synchronize live active context metrics");
+  assert.equal(res1.bulletPoints.length, 2);
+  assert.equal(res1.bulletPoints[0], "Status: Validated PTY parser with real token counts");
+  assert.equal(res1.bulletPoints[1], "Next: Implement silent post-response probe");
+
+  // Conversational snapshot with preamble
+  const conversationalSnapshot = `Voici la synthèse de l'état d'avancement pour la reprise de contexte.
+---
+# Objectif : Mise à niveau de la télémétrie active
+• Status: 188 tests au vert
+• Next: Déploiement en test
+`;
+  const res2 = extractCompactionSummary(conversationalSnapshot);
+  assert.equal(res2.activeGoal, "Mise à niveau de la télémétrie active");
+  assert.equal(res2.bulletPoints.length, 2);
+});
+
+
+

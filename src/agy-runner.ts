@@ -209,6 +209,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
   const agentSteps: { index: number; text: string }[] = [];
   let hasEncounteredToolCall = false;
   let usage: Usage | null = null;
+  let lastStepUsage: Usage | null = null;
   let durationMs: number | null = null;
   let numTurns: number | null = null;
   let toolCalls = 0;
@@ -253,7 +254,12 @@ export function parseStreamOutput(stdout: string): AgyResult {
       }
 
       const stepUsage = normalizeUsage(step?.usage);
-      if (stepUsage) usage = stepUsage;
+      if (stepUsage) {
+        usage = stepUsage;
+        if (typeof stepUsage.input_tokens === "number" && stepUsage.input_tokens > 0) {
+          lastStepUsage = stepUsage;
+        }
+      }
       const delta = stringValue(step?.text_delta) || stringValue(step?.text) || "";
       if (delta) {
         currentTurnText += delta;
@@ -313,6 +319,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
     conversationId,
     model,
     usage,
+    activeInputTokens: lastStepUsage?.input_tokens ?? usage?.input_tokens ?? null,
     durationMs,
     numTurns,
     toolCalls,
@@ -472,8 +479,9 @@ export function runAgy(config: AgyConfig, prompt: string, conversationId: string
 function parseJsonOutput(stdout: string): AgyResult {
   try {
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
-    return { text: pickText(parsed) || JSON.stringify(parsed, null, 2), intermediateText: null, parsed, events: [], conversationId: extractConversationId(parsed), model: stringValue(parsed.model), usage: normalizeUsage(parsed.usage), durationMs: numberOrNull(parsed.duration_seconds, (value) => value * 1000), numTurns: numberOrNull(parsed.num_turns), toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0, status: stringValue(parsed.status) };
-  } catch { return { text: stdout.trim() || "AGY returned no output.", intermediateText: null, parsed: null, events: [], conversationId: null, model: null, usage: null, durationMs: null, numTurns: null, toolCalls: 0, status: null }; }
+    const normUsage = normalizeUsage(parsed.usage);
+    return { text: pickText(parsed) || JSON.stringify(parsed, null, 2), intermediateText: null, parsed, events: [], conversationId: extractConversationId(parsed), model: stringValue(parsed.model), usage: normUsage, activeInputTokens: normUsage?.input_tokens ?? null, durationMs: numberOrNull(parsed.duration_seconds, (value) => value * 1000), numTurns: numberOrNull(parsed.num_turns), toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0, status: stringValue(parsed.status) };
+  } catch { return { text: stdout.trim() || "AGY returned no output.", intermediateText: null, parsed: null, events: [], conversationId: null, model: null, usage: null, activeInputTokens: null, durationMs: null, numTurns: null, toolCalls: 0, status: null }; }
 }
 
 function pickText(value: Record<string, unknown> | undefined): string {

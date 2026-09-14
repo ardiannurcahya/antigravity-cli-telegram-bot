@@ -38,13 +38,37 @@ export function showMain(context: AppContext, chatId: ChatId, messageId?: number
 }
 
 async function showMainInternal(context: AppContext, chatId: ChatId, messageId?: number): Promise<void> {
-  const settings = settingsFor(context, chatId);
   const text = "⚙️ AGY Control Panel";
   const keyboard = mainInlineKeyboard(context, chatId);
   if (messageId) {
     await context.telegram.editMessageText(chatId, messageId, text, keyboard);
+    await context.state.setSession(chatId, { lastMenuMessageId: messageId, activeMenuScreen: "main" });
   } else {
-    await reply(context, chatId, text, keyboard);
+    try {
+      const sent = await context.telegram.sendMessage(chatId, text, keyboard);
+      if (sent?.message_id) {
+        await context.state.setSession(chatId, { lastMenuMessageId: sent.message_id, activeMenuScreen: "main" });
+      }
+    } catch {
+      await reply(context, chatId, text, keyboard);
+    }
+  }
+}
+
+export async function refreshActiveMenu(context: AppContext, chatId: ChatId): Promise<void> {
+  const session = context.state.session(chatId);
+  if (!session?.lastMenuMessageId || !session.activeMenuScreen) return;
+  let keyboard: InlineKeyboardMarkup | undefined;
+  if (session.activeMenuScreen === "main") {
+    keyboard = mainInlineKeyboard(context, chatId);
+  } else if (session.activeMenuScreen === "clitools") {
+    keyboard = cliToolsKeyboard(context, chatId);
+  }
+  if (!keyboard) return;
+  try {
+    await context.telegram.editMessageReplyMarkup(chatId, session.lastMenuMessageId, keyboard);
+  } catch {
+    // Silently ignore if message cannot be modified or was deleted
   }
 }
 
@@ -106,6 +130,7 @@ export async function showCliOption(context: AppContext, chatId: ChatId, message
 
 export async function showMenu(context: AppContext, chatId: ChatId, messageId: number, kind: string, page = 0): Promise<void> {
   if (kind === "main") return showMain(context, chatId, messageId);
+  await context.state.setSession(chatId, { activeMenuScreen: kind });
   if (kind === "model" || kind === "models") {
     await refreshModels(context);
     return context.telegram.editMessageText(chatId, messageId, "Select a model:", modelKeyboard(context, chatId, page));

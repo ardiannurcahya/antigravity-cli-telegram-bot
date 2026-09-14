@@ -153,6 +153,22 @@ test("parseContextMetrics extracts token count and percentage", () => {
   assert.equal(metrics.percentage, 14);
 });
 
+test("parseContextMetrics calculates percentage from token fraction and ignores breakdown percentages", () => {
+  const output = `/context Visualize current context usage
+└ Context Usage
+◉ ◉ ◉     Gemini 3.8 Flash (High) · 212.2k/1.0M tokens
+Token breakdown
+• User messages: 293 tokens (0.0%)
+• Agent responses: 157.1k tokens (15.0%)
+• Tool calls: 30.2k tokens (2.9%)
+• System prompt: 8.6k tokens (0.8%)
+• System tools: 14.1k tokens (1.3%)
+• Free space: 836.3k (79.8%)`;
+  const metrics = parseContextMetrics(output);
+  assert.equal(metrics.tokens, "212.2k");
+  assert.equal(metrics.percentage, 21);
+});
+
 test("parseContextMetrics returns empty object when metrics missing", () => {
   assert.deepEqual(parseContextMetrics("No tokens here"), {});
 });

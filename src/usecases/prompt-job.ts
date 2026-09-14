@@ -14,6 +14,7 @@ import { addUsage, formatTokenCount } from "../domain/usage-math.js";
 import { reply, replyWithFormattedResponse, replyWithHtml } from "../ui/reply.js";
 import { usageText } from "../ui/messages.js";
 import { contextActionsKeyboard } from "../ui/inline-keyboards.js";
+import { refreshActiveMenu } from "../ui/screens.js";
 import { runCompactionJob } from "./compaction.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
 import { parseChatTarget } from "../telegram/client.js";
@@ -88,6 +89,7 @@ async function runPtyReportJob(context: AppContext, job: QueueJob & { kind: PtyR
           contextTokens: metrics.tokens,
           contextPercentage: metrics.percentage,
         });
+        await refreshActiveMenu(context, job.chatId);
       }
     }
     if (progressMessage) await context.telegram.editMessageText(job.chatId, progressMessage.message_id, spec.doneMessage).catch(() => undefined);
@@ -295,10 +297,10 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const initialTitle = (job.prompt ? job.prompt.replace(/\s+/g, " ").slice(0, 60).trim() : "") || "Conversation";
     const convTitle = latestSession?.conversationTitle || initialTitle;
     const stepCount = (latestSession?.conversationStepCount || 0) + (result.numTurns || 1);
-    const tokenCount = result.usage?.input_tokens ?? result.usage?.total_tokens;
-    const formattedTokens = formatTokenCount(tokenCount);
+    const activeTokens = result.activeInputTokens ?? result.usage?.input_tokens ?? result.usage?.total_tokens;
+    const formattedTokens = formatTokenCount(activeTokens);
     const maxTokens = getActiveModels().find((m) => m.id === (result.model || settings.model))?.maxContextWindow || 1_000_000;
-    const contextPct = tokenCount ? Math.min(100, Math.round((tokenCount / maxTokens) * 100)) : undefined;
+    const contextPct = activeTokens ? Math.min(100, Math.round((activeTokens / maxTokens) * 100)) : undefined;
 
     await context.state.setSession(job.chatId, {
       ...(result.conversationId ? { conversationId: result.conversationId } : {}),
@@ -311,6 +313,8 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: contextPct } : {}),
       updatedAt: new Date().toISOString(),
     });
+
+    await refreshActiveMenu(context, job.chatId);
 
     if (effectiveConvId) {
       context.convDb.upsertConversation({
@@ -422,6 +426,27 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
             await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
           }
         }
+      }
+    }
+
+    // Background telemetry probe: sync live active context tokens and refresh active menu in place
+    if (effectiveConvId && !isCancelled() && !controller.signal.aborted) {
+      try {
+        const output = await runPtyCommand(effectiveAgyConfig, "/context", {
+          conversationId: effectiveConvId,
+          timeoutMs: 10_000,
+        });
+        const metrics = parseContextMetrics(output);
+        if (metrics.tokens) {
+          await context.state.setSession(job.chatId, {
+            contextTokens: metrics.tokens,
+            contextPercentage: metrics.percentage,
+          });
+          await refreshActiveMenu(context, job.chatId);
+        }
+      } catch (err) {
+        // Silently ignore telemetry probe failures to never disrupt the user experience
+        console.debug(`[Telemetry] Post-prompt context probe failed: ${(err as Error).message}`);
       }
     }
   } catch (error) {
