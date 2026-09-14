@@ -6,7 +6,7 @@ const REGISTERED_COMMANDS = [
   "status", "cancel", "model", "effort", "mode", "sandbox", "verbose", "savedefault", "session",
   "learn", "help", "agents", "agent", "project", "add_dir", "output_format", "json_schema",
   "log_file", "print_timeout", "continue", "new_project", "disable_slash_commands",
-  "changelog", "plugins", "cli_help", "version", "update", "restart", "agy", "agy_confirm"
+  "changelog", "plugins", "cli_help", "version", "update", "restart", "compact", "agy", "agy_confirm"
 ];
 
 // List of all commands handled in src/index.ts
@@ -16,7 +16,7 @@ const HANDLED_COMMANDS = new Set([
   "/log-file", "/print-timeout", "/resume", "/sessions", "/continue",
   "/new-project", "/disable-slash-commands", "/agents", "/changelog",
   "/plugins", "/cli-help", "/version", "/session", "/learn", "/usage", "/quota",
-  "/credits", "/context", "/tokens", "/status", "/cancel", "/update", "/restart", "/agy-confirm"
+  "/credits", "/context", "/tokens", "/status", "/cancel", "/update", "/restart", "/compact", "/agy-confirm"
 ]);
 
 test("all registered telegram commands map to a recognized command handler", () => {

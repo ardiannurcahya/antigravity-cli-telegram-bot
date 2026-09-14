@@ -23,7 +23,7 @@ const baseConfig: AgyConfig = {
 
 test("golden: buildArgs emits exact CLI contract for a default stream-json prompt", () => {
   const args = buildArgs(baseConfig, "hello", null, {});
-  assert.deepEqual(args, ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--mode", "accept-edits", "--effort", "high"]);
+  assert.deepEqual(args, ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--mode", "accept-edits", "--effort", "high", "--add-dir", "/srv/ws"]);
 });
 
 test("golden: buildArgs injects attachment notes and add-dir for image and document runs", () => {

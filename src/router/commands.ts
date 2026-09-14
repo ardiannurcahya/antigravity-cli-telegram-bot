@@ -555,10 +555,10 @@ command("/learn")(async ({ context, chatId, args }) => {
 });
 
 command("/compact")(async ({ context, chatId, args }) => {
-  const promptText = args.length > 0
-    ? `Please compact the conversation context: ${args.join(" ")}`
-    : "Please compact our conversation context by consolidating vital state, active goals, decisions, and modified files internally, discarding temporary logs, and providing a concise token savings summary.";
-  enqueueJob(context, chatId, { prompt: promptText, kind: "prompt" });
+  enqueueJob(context, chatId, {
+    kind: "compact",
+    prompt: args.length > 0 ? args.join(" ") : undefined,
+  });
 });
 
 command("/agy-confirm")(async ({ context, chatId }) => {

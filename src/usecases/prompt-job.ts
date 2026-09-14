@@ -4,15 +4,17 @@ import path from "node:path";
 import type { AppContext } from "../context.js";
 import { controllerKey } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
-import { modelLabel } from "../models.js";
+import { modelLabel, getActiveModels } from "../models.js";
 import type { QueueJob } from "../queue.js";
 import { escapeHtml, findReferencedMediaFiles } from "../telegram.js";
 import { formatStepUpdate, runAgy } from "../agy-runner.js";
-import { parseContext, parseCredits, parseUsageQuota, runPtyCommand } from "../pty-runner.js";
+import { parseContext, parseContextMetrics, parseCredits, parseUsageQuota, runPtyCommand } from "../pty-runner.js";
 import { settingsFor } from "../domain/settings.js";
-import { addUsage } from "../domain/usage-math.js";
+import { addUsage, formatTokenCount } from "../domain/usage-math.js";
 import { reply, replyWithFormattedResponse, replyWithHtml } from "../ui/reply.js";
 import { usageText } from "../ui/messages.js";
+import { contextActionsKeyboard } from "../ui/inline-keyboards.js";
+import { runCompactionJob } from "./compaction.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
 import { parseChatTarget } from "../telegram/client.js";
 import { createTtsService } from "../tts/tts-service.js";
@@ -67,15 +69,32 @@ async function runPtyReportJob(context: AppContext, job: QueueJob & { kind: PtyR
     }
     await context.telegram.sendChatAction(job.chatId);
     progressMessage = await context.telegram.sendMessage(job.chatId, spec.startingMessage);
-    const output = await runPtyCommand(context.config.agy, spec.ptyCommand, {
+    const settings = settingsFor(context, job.chatId);
+    const effectiveWorkspace = settings.workspace || context.config.agy.workspace;
+    const effectiveAgyConfig = effectiveWorkspace === context.config.agy.workspace
+      ? context.config.agy
+      : { ...context.config.agy, workspace: effectiveWorkspace };
+    const output = await runPtyCommand(effectiveAgyConfig, spec.ptyCommand, {
       conversationId: spec.conversationId?.(session),
       timeoutMs: 15_000,
       signal: controller.signal,
     });
     if (isCancelled()) return;
     const formatted = spec.format(output);
+    if (job.kind === "context") {
+      const metrics = parseContextMetrics(output);
+      if (metrics.tokens) {
+        await context.state.setSession(job.chatId, {
+          contextTokens: metrics.tokens,
+          contextPercentage: metrics.percentage,
+        });
+      }
+    }
     if (progressMessage) await context.telegram.editMessageText(job.chatId, progressMessage.message_id, spec.doneMessage).catch(() => undefined);
-    await replyWithHtml(context, job.chatId, formatted, createMainKeyboard(settingsFor(context, job.chatId)));
+    const replyMarkup = job.kind === "context"
+      ? contextActionsKeyboard()
+      : createMainKeyboard(settingsFor(context, job.chatId));
+    await replyWithHtml(context, job.chatId, formatted, replyMarkup);
   } catch (error) {
     if (!isCancelled()) {
       const errorMsg = (error as Error).message;
@@ -89,6 +108,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
   const controller = new AbortController();
   context.controllers.set(controllerKey("prompt", job.chatId), controller);
   let progressMessage: { message_id: number } | null = null;
+
+  if (job.kind === "compact") {
+    await runCompactionJob(context, job, controller, isCancelled);
+    context.controllers.delete(controllerKey("prompt", job.chatId));
+    return;
+  }
 
   if (job.kind === "usage" || job.kind === "credits" || job.kind === "context") {
     await runPtyReportJob(context, job as QueueJob & { kind: PtyReportKind }, controller, isCancelled);
@@ -270,6 +295,10 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const initialTitle = (job.prompt ? job.prompt.replace(/\s+/g, " ").slice(0, 60).trim() : "") || "Conversation";
     const convTitle = latestSession?.conversationTitle || initialTitle;
     const stepCount = (latestSession?.conversationStepCount || 0) + (result.numTurns || 1);
+    const tokenCount = result.usage?.input_tokens ?? result.usage?.total_tokens;
+    const formattedTokens = formatTokenCount(tokenCount);
+    const maxTokens = getActiveModels().find((m) => m.id === (result.model || settings.model))?.maxContextWindow || 1_000_000;
+    const contextPct = tokenCount ? Math.min(100, Math.round((tokenCount / maxTokens) * 100)) : undefined;
 
     await context.state.setSession(job.chatId, {
       ...(result.conversationId ? { conversationId: result.conversationId } : {}),
@@ -279,6 +308,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       settings: latestSession?.settings || settings,
       lastRun,
       usageTotals: addUsage(latestSession?.usageTotals, result.usage),
+      ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: contextPct } : {}),
       updatedAt: new Date().toISOString(),
     });
 

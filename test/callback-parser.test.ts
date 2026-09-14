@@ -16,6 +16,7 @@ test("callback parser decodes every wire format the keyboards emit", () => {
   assert.deepEqual(parseCallbackAction("action:usage"), { kind: "usage" });
   assert.deepEqual(parseCallbackAction("action:credits"), { kind: "credits" });
   assert.deepEqual(parseCallbackAction("action:context"), { kind: "context" });
+  assert.deepEqual(parseCallbackAction("action:compact"), { kind: "compact" });
   assert.deepEqual(parseCallbackAction("action:setdefault"), { kind: "setdefault" });
   assert.deepEqual(parseCallbackAction("action:update_bot"), { kind: "update-bot" });
   assert.deepEqual(parseCallbackAction("action:new"), { kind: "new-session" });
@@ -48,6 +49,7 @@ test("callback parser/serializer round-trips without loss", () => {
     "action:usage",
     "action:credits",
     "action:context",
+    "action:compact",
     "action:setdefault",
     "action:update_bot",
     "action:new",

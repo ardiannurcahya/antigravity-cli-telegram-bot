@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanAnsi, parseUsageQuota, parseCredits, parseContext, runPtyCommand } from "../src/pty-runner.js";
+import { cleanAnsi, parseUsageQuota, parseCredits, parseContext, parseContextMetrics, runPtyCommand } from "../src/pty-runner.js";
 
 test("cleanAnsi removes terminal escape codes, OSC sequences, and kitty sequences", () => {
   const raw = "\x1b[>4m\x1b[=0;1u\x1b[?2004h\x1b]0;Terminal Title\x07\x1b[32mHello\x1b[0m \x1b[1;34mWorld\x1b[0m\r\n\x1b[2J\x1b[H\x1b[?2004l";
@@ -145,6 +145,16 @@ test("parseContext formats official active-context output", () => {
 
 test("parseContext rejects output without active context data", () => {
   assert.throws(() => parseContext("Antigravity CLI ready"), /Active Context report/);
+});
+
+test("parseContextMetrics extracts token count and percentage", () => {
+  const metrics = parseContextMetrics("/context Visualize current context usage\n└ Context Usage\n◉ ◉ ◉     Gemini 3.6 Flash (High) · 146.3k/1.0M tokens\n□ □ □     (14.0%)\n□ □ □     Token usage by category");
+  assert.equal(metrics.tokens, "146.3k");
+  assert.equal(metrics.percentage, 14);
+});
+
+test("parseContextMetrics returns empty object when metrics missing", () => {
+  assert.deepEqual(parseContextMetrics("No tokens here"), {});
 });
 
 test("parseUsageQuota preserves decimal percentages from AGY progress output", () => {

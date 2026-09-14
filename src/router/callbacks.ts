@@ -62,6 +62,9 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
     case "context":
       enqueueJob(context, chatId, { kind: "context" });
       return;
+    case "compact":
+      enqueueJob(context, chatId, { kind: "compact" });
+      return;
     case "cli":
       await handleCliAction(context, chatId, messageId, action.command);
       return;

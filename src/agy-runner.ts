@@ -39,6 +39,7 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
   }
   if (effective.agent) args.push("--agent", effective.agent);
   const dirs = new Set(effective.addDirs || []);
+  if (effective.workspace?.trim()) dirs.add(effective.workspace.trim());
   if (overrides.imagePath) dirs.add(path.dirname(overrides.imagePath));
   if (overrides.documentPath) dirs.add(path.dirname(overrides.documentPath));
   if (overrides.mediaPath) dirs.add(path.dirname(overrides.mediaPath));

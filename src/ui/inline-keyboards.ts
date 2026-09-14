@@ -2,11 +2,27 @@ import type { AppContext } from "../context.js";
 import { getActiveModels } from "../models.js";
 import { settingsFor } from "../domain/settings.js";
 import { listAvailableWorkspaces } from "../domain/workspace.js";
-import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary } from "../types.js";
+import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary, SessionState } from "../types.js";
 
 export function button(text: string, callback_data: string): { text: string; callback_data: string } { return { text, callback_data }; }
 
 export function backKeyboard(): InlineKeyboardMarkup { return { inline_keyboard: [[button("‹ Back", "menu:main")]] }; }
+
+export function contextActionsKeyboard(): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [button("🗜️ Compact Context", "action:compact"), button("🔄 Refresh", "action:context")],
+    ],
+  };
+}
+
+export function contextButtonLabel(session?: SessionState | null): string {
+  if (session?.contextTokens) {
+    const pct = session.contextPercentage !== undefined ? ` (${session.contextPercentage}%)` : "";
+    return `🧠 ${session.contextTokens}${pct}`;
+  }
+  return "🧠 Active Context";
+}
 
 export function resumeKeyboard(page = 0, totalPages = 1, items: ConversationSummary[] = []): InlineKeyboardMarkup {
   const rows: InlineButton[][] = items.map((item) => [
@@ -140,12 +156,13 @@ export function mainInlineKeyboard(context?: AppContext, chatId?: ChatId): Inlin
   }
 
   if (profile === "dev") {
+    const session = context && chatId ? context.state.session(chatId) : null;
     return {
       inline_keyboard: [
         [button("📁 Workspace", "menu:workspace"), button("📂 Resume Session", "menu:resume")],
         [button("⚙️ Mode (Plan/Edit)", "menu:mode"), button("🛡️ Sandbox", "menu:sandbox")],
         [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
-        [button("🛠️ CLI Options", "menu:cli"), button("🧠 Active Context", "action:context")],
+        [button("🛠️ CLI Options", "menu:cli"), button(contextButtonLabel(session), "action:context")],
         [profileBtn, closeBtn],
       ],
     };
@@ -174,9 +191,10 @@ export function modeSandboxKeyboard(context: AppContext, chatId: ChatId): Inline
 }
 
 export function cliToolsKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const session = context.state.session(chatId);
   return {
     inline_keyboard: [
-      [button("🛠️ CLI Options", "menu:cli"), button("🧠 Active Context", "action:context")],
+      [button("🛠️ CLI Options", "menu:cli"), button(contextButtonLabel(session), "action:context")],
       [button("AGY Agents", "cli:agents"), button("🧩 Plugins", "menu:plugins")],
       [button("Changelog", "cli:changelog"), button("CLI Help", "cli:help")],
       [button("CLI Version", "cli:version"), button("Custom /agy", "menu:custom")],

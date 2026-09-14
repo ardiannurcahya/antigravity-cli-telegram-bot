@@ -6,7 +6,7 @@ import type { AgyConfig } from "../src/types.js";
 const config: AgyConfig = { timeoutMs: 60000, project: "project", mode: "plan", model: "model", effort: "high", sandbox: true, allowSandboxDisable: false, allowDangerouslySkipPermissions: false, allowedModels: [], bin: "agy", workspace: "/tmp" , maxOutputBytes: 2000000 };
 
 test("builds non-interactive safe AGY arguments", () => {
-  assert.deepEqual(buildArgs(config, "hello", "conv-1"), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "plan", "--model", "model", "--effort", "high", "--sandbox", "--conversation", "conv-1"]);
+  assert.deepEqual(buildArgs(config, "hello", "conv-1"), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "plan", "--model", "model", "--effort", "high", "--add-dir", "/tmp", "--sandbox", "--conversation", "conv-1"]);
 });
 
 test("passes the selected agent to AGY", () => {
@@ -21,7 +21,7 @@ test("builds the complete non-interactive option set", () => {
     agent: "reviewer", addDirs: ["/one", "/two"], continueSession: true, newProject: true,
     disableSlashCommands: true, jsonSchema: '{"type":"object"}', logFile: "/tmp/agy.log",
     printTimeout: "10m", dangerouslySkipPermissions: true,
-  }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "10m", "--project", "project", "--mode", "plan", "--model", "model", "--effort", "high", "--agent", "reviewer", "--add-dir", "/one", "--add-dir", "/two", "--new-project", "--disable-slash-commands", "--json-schema", '{"type":"object"}', "--log-file", "/tmp/agy.log", "--dangerously-skip-permissions", "--sandbox", "--continue"]);
+  }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "10m", "--project", "project", "--mode", "plan", "--model", "model", "--effort", "high", "--agent", "reviewer", "--add-dir", "/one", "--add-dir", "/two", "--add-dir", "/tmp", "--new-project", "--disable-slash-commands", "--json-schema", '{"type":"object"}', "--log-file", "/tmp/agy.log", "--dangerously-skip-permissions", "--sandbox", "--continue"]);
 });
 
 test("prioritizes --conversation over --continue when conversationId is provided", () => {
@@ -42,7 +42,7 @@ test("parses quoted custom command arguments without a shell", () => {
 });
 
 test("builds per-session overrides without unsafe flags", () => {
-  assert.deepEqual(buildArgs(config, "hello", null, { model: "claude-sonnet-4-6", effort: "low", mode: "accept-edits", sandbox: false }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "accept-edits", "--model", "claude-sonnet-4-6"]);
+  assert.deepEqual(buildArgs(config, "hello", null, { model: "claude-sonnet-4-6", effort: "low", mode: "accept-edits", sandbox: false }), ["--print", "hello", "--output-format", "stream-json", "--print-timeout", "60s", "--project", "project", "--mode", "accept-edits", "--model", "claude-sonnet-4-6", "--add-dir", "/tmp"]);
 });
 
 test("extracts nested conversation IDs", () => {

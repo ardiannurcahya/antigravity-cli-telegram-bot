@@ -99,6 +99,8 @@ export interface SessionState {
   settings?: Partial<SessionSettings>;
   lastRun?: RunStats;
   usageTotals?: Usage | null;
+  contextTokens?: string;
+  contextPercentage?: number;
   updatedAt?: string;
 }
 
@@ -112,7 +114,7 @@ export interface ConversationSummary {
 
 export interface InFlightJob {
   prompt?: string;
-  kind?: "prompt" | "usage" | "credits" | "context";
+  kind?: "prompt" | "usage" | "credits" | "context" | "compact";
   imagePath?: string;
   documentPath?: string;
   documentName?: string;

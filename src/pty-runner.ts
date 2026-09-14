@@ -306,6 +306,20 @@ export function parseContext(rawOutput: string): string {
   return result.join("\n");
 }
 
+export function parseContextMetrics(rawOutput: string): { tokens?: string; percentage?: number } {
+  try {
+    const text = cleanAnsi(rawOutput);
+    const tokenMatch = text.match(/([\d.]+[kKmM]?)\s*\/\s*[\d.]+[kKmM]?\s*tokens/i);
+    const pctMatch = text.match(/\(\s*([\d.]+)\s*%\s*\)/);
+    const result: { tokens?: string; percentage?: number } = {};
+    if (tokenMatch) result.tokens = tokenMatch[1].trim();
+    if (pctMatch) result.percentage = Math.round(parseFloat(pctMatch[1]));
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 const PTY_SCRIPT = `
 import pty, os, sys, time, select, signal, re, struct, fcntl, termios
 

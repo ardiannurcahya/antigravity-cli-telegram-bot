@@ -11,6 +11,7 @@ export type CallbackAction =
   | { kind: "usage" }
   | { kind: "credits" }
   | { kind: "context" }
+  | { kind: "compact" }
   | { kind: "setdefault" }
   | { kind: "update-bot" }
   | { kind: "new-session" }
@@ -45,6 +46,7 @@ export function parseCallbackAction(data: string): CallbackAction | null {
   if (data === "action:usage") return { kind: "usage" };
   if (data === "action:credits") return { kind: "credits" };
   if (data === "action:context") return { kind: "context" };
+  if (data === "action:compact") return { kind: "compact" };
   if (data === "action:setdefault") return { kind: "setdefault" };
   if (data === "action:update_bot") return { kind: "update-bot" };
   if (data === "action:new") return { kind: "new-session" };
@@ -70,6 +72,7 @@ export function serializeCallbackData(action: CallbackAction): string {
     case "usage": return "action:usage";
     case "credits": return "action:credits";
     case "context": return "action:context";
+    case "compact": return "action:compact";
     case "setdefault": return "action:setdefault";
     case "update-bot": return "action:update_bot";
     case "new-session": return "action:new";
