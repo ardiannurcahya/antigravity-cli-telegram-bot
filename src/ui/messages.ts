@@ -77,15 +77,9 @@ export function sessionText(context: AppContext, chatId: ChatId): string {
 
 export function resumeMessageText(pageData: ConversationPage): string {
   if (pageData.total === 0 || pageData.items.length === 0) {
-    return "<b>AGY Sessions</b>\n\nNo saved conversations found in AGY database.";
+    return "<b>📂 AGY Sessions</b>\n\nNo saved conversations found in AGY database.";
   }
-  const list = pageData.items
-    .map((item) => {
-      const time = formatRelativeTime(item.last_modified_time);
-      return `<b>${escapeHtml(item.display_title)}</b>\n${item.step_count} steps · ${time}`;
-    })
-    .join("\n\n");
-  return `<b>AGY Sessions</b>\nPage ${pageData.page + 1}/${pageData.totalPages}\n\n${list}`;
+  return `<b>📂 AGY Sessions</b>\nPage ${pageData.page + 1}/${pageData.totalPages} (${pageData.total} total)\nSelect a session to resume:`;
 }
 
 export function usageReport(context: AppContext, chatId: ChatId): string {

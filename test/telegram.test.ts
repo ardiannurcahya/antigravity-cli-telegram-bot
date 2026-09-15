@@ -3,8 +3,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { cleanLatexMath, escapeHtml, executeWithRetry, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, isRetryableNetworkError, sanitizeLatexExpressions, splitMessage, splitPreformattedHtml, TelegramApiError, TelegramClient } from "../src/telegram.js";
+import { cleanLatexMath, escapeHtml, executeWithRetry, findReferencedMediaFiles, formatTelegramHtml, formatTelegramHtmlChunks, isAllowedLocalMediaPath, isRetryableNetworkError, sanitizeLatexExpressions, splitMessage, splitPreformattedHtml, TelegramApiError, TelegramClient } from "../src/telegram.js";
 import { createMainKeyboard } from "../src/keyboards.js";
+
+test("isAllowedLocalMediaPath permits tmp, var/tmp, brain, and agy-telegram state dirs", () => {
+  const home = os.homedir();
+  assert.equal(isAllowedLocalMediaPath(path.join(os.tmpdir(), "photo.png")), true);
+  assert.equal(isAllowedLocalMediaPath("/var/tmp/chart.jpg"), true);
+  assert.equal(isAllowedLocalMediaPath(path.join(home, ".gemini/antigravity-cli/brain/conv1/image.png")), true);
+  assert.equal(isAllowedLocalMediaPath(path.join(home, ".local/state/agy-telegram/tmp/screen.png")), true);
+  assert.equal(isAllowedLocalMediaPath("/var/lib/agy-telegram/uploads/file.png"), true);
+  assert.equal(isAllowedLocalMediaPath("/etc/shadow"), false);
+  assert.equal(isAllowedLocalMediaPath(path.join(home, ".ssh/id_rsa")), false);
+});
 
 test("splitPreformattedHtml preserves HTML tags without double escaping", () => {
   const html = "📊 <b>Models & Quota</b>\n\n<b>Account:</b> <code>user@example.com</code>\n\n• Weekly Limit: <b>94%</b>";
@@ -97,14 +108,22 @@ test("formatTelegramHtml preserves double quotes in code blocks without escaping
 
 test("findReferencedMediaFiles detects markdown images and file paths", async () => {
   const tmpImg = path.join(os.tmpdir(), `test-img-${Date.now()}.png`);
+  const tmpImg2 = path.join(os.tmpdir(), `test-img2-${Date.now()}.png`);
+  const tmpImg3 = path.join(os.tmpdir(), `test-img3-${Date.now()}.png`);
   await fs.writeFile(tmpImg, "fake png content");
+  await fs.writeFile(tmpImg2, "fake png content 2");
+  await fs.writeFile(tmpImg3, "fake png content 3");
   try {
-    const text = `Here is the architecture chart:\n\n![Arch](${tmpImg})\n\nAnd check file://${tmpImg}`;
+    const text = `Here is the architecture chart:\n\n![Arch](${tmpImg})\n\nAnd check file://${tmpImg}\n\nMEDIA:${tmpImg2}\n\nScreenshot saved to: ${tmpImg3}`;
     const media = await findReferencedMediaFiles(text);
-    assert.equal(media.length, 1);
-    assert.equal(media[0], tmpImg);
+    assert.equal(media.length, 3);
+    assert.ok(media.includes(tmpImg));
+    assert.ok(media.includes(tmpImg2));
+    assert.ok(media.includes(tmpImg3));
   } finally {
     await fs.unlink(tmpImg).catch(() => undefined);
+    await fs.unlink(tmpImg2).catch(() => undefined);
+    await fs.unlink(tmpImg3).catch(() => undefined);
   }
 });
 

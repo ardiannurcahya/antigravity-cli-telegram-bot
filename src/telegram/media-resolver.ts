@@ -108,7 +108,15 @@ export function isAllowedLocalMediaPath(filePath: string, workspaceDir?: string)
   const tempDir = path.resolve(os.tmpdir());
   const varTmp = path.resolve("/var/tmp");
   const brainDir = path.resolve(os.homedir(), ".gemini/antigravity-cli/brain");
-  if (isWithin(tempDir, resolved) || isWithin(varTmp, resolved) || isWithin(brainDir, resolved)) return true;
+  const stateDir = path.resolve(os.homedir(), ".local/state/agy-telegram");
+  const varLibDir = path.resolve("/var/lib/agy-telegram");
+  if (
+    isWithin(tempDir, resolved) ||
+    isWithin(varTmp, resolved) ||
+    isWithin(brainDir, resolved) ||
+    isWithin(stateDir, resolved) ||
+    isWithin(varLibDir, resolved)
+  ) return true;
   if (workspaceDir && isWithin(workspaceDir, resolved)) return true;
   return false;
 }
@@ -130,7 +138,19 @@ export async function findReferencedMediaFiles(text: string, workspaceDir?: stri
     candidates.add(rawPath);
   }
 
-  // 3. Temporary / preview images (e.g. /tmp/preview_*.jpg or /tmp/*.png)
+  // 3. MEDIA: tags (e.g. MEDIA:/path/to/img.png from skills or tools)
+  const mediaTagRegex = /\bMEDIA:(?:file:\/\/)?([^\s\n\r"']+\.(?:png|jpe?g|webp|gif|svg))\b/gi;
+  for (const match of text.matchAll(mediaTagRegex)) {
+    candidates.add(match[1].trim());
+  }
+
+  // 4. Explicit saved-to labels (e.g. "Screenshot saved to: /path/to/img.png")
+  const savedToRegex = /(?:screenshot|image)(?:\s+saved\s+to)?:\s*(?:file:\/\/)?([^\s\n\r"']+\.(?:png|jpe?g|webp|gif|svg))\b/gi;
+  for (const match of text.matchAll(savedToRegex)) {
+    candidates.add(match[1].trim());
+  }
+
+  // 5. Temporary / state / brain preview images
   const mediaPathRegex = /(?:^|[\s"'`(\[])(\/(?:tmp|var\/tmp)[^\s"'`)\]]+\.(?:png|jpe?g|webp|gif|svg))/gi;
   for (const match of text.matchAll(mediaPathRegex)) {
     candidates.add(match[1].trim());

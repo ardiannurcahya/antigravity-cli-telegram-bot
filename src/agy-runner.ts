@@ -381,6 +381,7 @@ export function formatStepUpdate(stepUpdate: Record<string, unknown> | undefined
   if (stepUpdate.step_type === "agent_response") return "💬 Generating response...";
   if (stepUpdate.step_type === "checkpoint") return "💾 Saving checkpoint...";
   if (stepUpdate.step_type === "thinking" || typeof stepUpdate.thought === "string") return "🤔 Thinking...";
+  if (stepUpdate.step_type === "error_message" || stepUpdate.step_type === "error") return "⚠️ API retry / error recovery...";
   if (typeof stepUpdate.step_type === "string" && !["user_input", "unknown"].includes(stepUpdate.step_type)) return `Step: ${stepUpdate.step_type}`;
   return null;
 }

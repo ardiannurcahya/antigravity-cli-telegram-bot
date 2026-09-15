@@ -1,5 +1,6 @@
 import type { AppContext } from "../context.js";
 import { getActiveModels } from "../models.js";
+import { formatRelativeTime } from "../db.js";
 import { settingsFor } from "../domain/settings.js";
 import { listAvailableWorkspaces } from "../domain/workspace.js";
 import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary, SessionState } from "../types.js";
@@ -25,15 +26,23 @@ export function contextButtonLabel(session?: SessionState | null): string {
 }
 
 export function resumeKeyboard(page = 0, totalPages = 1, items: ConversationSummary[] = []): InlineKeyboardMarkup {
-  const rows: InlineButton[][] = items.map((item) => [
-    button(
-      item.display_title.length > 40 ? `${item.display_title.slice(0, 37)}...` : item.display_title,
-      `resume:use:${item.conversation_id}`
-    ),
-  ]);
+  const rows: InlineButton[][] = items.map((item) => {
+    const time = formatRelativeTime(item.last_modified_time);
+    const suffix = ` (${time})`;
+    const maxTitleLen = Math.max(12, 38 - suffix.length);
+    const title = item.display_title.length > maxTitleLen
+      ? `${item.display_title.slice(0, maxTitleLen - 1)}…`
+      : item.display_title;
+    return [
+      button(
+        `💬 ${title}${suffix}`,
+        `resume:use:${item.conversation_id}`
+      ),
+    ];
+  });
   const navigation: InlineButton[] = [];
   if (page > 0) navigation.push(button("‹ Previous", `resume:page:${page - 1}`));
-  navigation.push(button(`Page ${page + 1}/${totalPages}`, "noop"));
+  navigation.push(button(`${page + 1}/${totalPages}`, "noop"));
   if (page < totalPages - 1) navigation.push(button("Next ›", `resume:page:${page + 1}`));
   if (navigation.length) rows.push(navigation);
   rows.push([button("‹ Back", "menu:main")]);
@@ -172,8 +181,8 @@ export function mainInlineKeyboard(context?: AppContext, chatId?: ChatId): Inlin
   return {
     inline_keyboard: [
       [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
-      [button("🎙️ Voice Settings", "menu:voice"), button("📁 Workspace", "menu:workspace")],
-      [button("⚙️ Mode & Sandbox", "menu:modesandbox"), button("🛠️ CLI & Tools", "menu:clitools")],
+      [button("📁 Workspace", "menu:workspace"), button("📂 Resume Session", "menu:resume")],
+      [button("🎙️ Voice Settings", "menu:voice"), button("🛠️ CLI & Tools", "menu:clitools")],
       [profileBtn, closeBtn],
     ],
   };
@@ -194,12 +203,13 @@ export function cliToolsKeyboard(context: AppContext, chatId: ChatId): InlineKey
   const session = context.state.session(chatId);
   return {
     inline_keyboard: [
-      [button("🛠️ CLI Options", "menu:cli"), button(contextButtonLabel(session), "action:context")],
-      [button("AGY Agents", "cli:agents"), button("🧩 Plugins", "menu:plugins")],
+      [button("⚙️ Mode & Sandbox", "menu:modesandbox"), button("🛠️ CLI Options", "menu:cli")],
+      [button("AGY Agents", "cli:agents"), button(contextButtonLabel(session), "action:context")],
+      [button("🧩 Plugins", "menu:plugins"), button("Custom /agy", "menu:custom")],
       [button("Changelog", "cli:changelog"), button("CLI Help", "cli:help")],
-      [button("CLI Version", "cli:version"), button("Custom /agy", "menu:custom")],
-      [button("Update CLI", "cli:update"), button("🔄 Update Bot", "action:update_bot")],
-      [button("💾 Set as Default", "action:setdefault"), button("New session", "action:new")],
+      [button("CLI Version", "cli:version"), button("Update CLI", "cli:update")],
+      [button("🔄 Update Bot", "action:update_bot"), button("💾 Set as Default", "action:setdefault")],
+      [button("New session", "action:new")],
       [button("‹ Back", "menu:main")],
     ],
   };

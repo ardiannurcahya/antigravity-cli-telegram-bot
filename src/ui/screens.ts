@@ -73,7 +73,7 @@ export async function refreshActiveMenu(context: AppContext, chatId: ChatId): Pr
 }
 
 export async function showResumeMenu(context: AppContext, chatId: ChatId, page = 0, messageId?: number): Promise<void> {
-  const pageData = context.convDb.getConversations(page, 10);
+  const pageData = context.convDb.getConversations(page, 5);
   const text = resumeMessageText(pageData);
   const keyboard = resumeKeyboard(pageData.page, pageData.totalPages, pageData.items);
   if (messageId) {

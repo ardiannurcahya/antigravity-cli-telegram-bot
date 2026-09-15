@@ -69,6 +69,7 @@ test("normalizes usage and formats progress", () => {
   assert.equal(formatStepUpdate({ tool_info: { name: "run_command", parameters: { CommandLine: "npm test" } } }), "⚙️ Command: npm test");
   assert.equal(formatStepUpdate({ tool_info: { name: "search_web", parameters: { query: "werecycle" } } }), "🔍 Web search: \"werecycle\"");
   assert.equal(formatStepUpdate({ step_type: "agent_response" }), "💬 Generating response...");
+  assert.equal(formatStepUpdate({ step_type: "error_message" }), "⚠️ API retry / error recovery...");
 });
 
 test("runs a read-only AGY subcommand without Telegram secrets", async () => {
