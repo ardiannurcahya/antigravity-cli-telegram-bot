@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-16
+
+### Added
+- **Orchestrator-Level Context Compaction (`/compact`)**:
+  - Full 3-phase compaction pipeline: Handover Snapshot Synthesis -> Clean Session Reset -> Seamless Re-hydration without losing active workspace or user preferences (#40, #42).
+  - **Atomic Session Protection**: Active session remains intact with rollback guards if snapshot generation or re-hydration is cancelled, times out, or fails.
+  - **Single Source of Telemetry Truth**: Strict anti-hallucination prompt constraints preventing the model from guessing token counts; telemetry is derived purely from programmatic CLI metrics.
+  - **Clean In-Place Progress Banner**: In-place progress message update eliminates chat clutter while keeping the active goal and token reduction transparent.
+- **Dynamic Context Telemetry & Inline Action Buttons**:
+  - Live token consumption displayed directly on the `dev` and `cli` menu buttons (e.g. `45k (5%)` or `12k`) using formatted metric labels (`formatTokenCount`).
+  - Added interactive `Compact Context` and `Refresh` action buttons directly beneath `/context` breakdown reports.
+  - Auto-refreshes active context telemetry on menu screen opens and callback navigations (#43).
+- **3-Profile `/menu` Revamp & Ergonomics**:
+  - Introduced 3 switchable menu profiles: `Mixed` (balanced default), `Daily` (minimalist 3-row layout for fast chat and voice), and `Dev` (developer-centric with workspace, context telemetry, and modes) (#39, #41).
+  - **In-Menu Profile Switcher (`Profile: ...`)**: Instant toggling between profiles directly on the inline keyboard.
+  - **1-Tap Quick Menu Button**: Replaced `Model` with `Menu` on the persistent reply keyboard beside the chat input for instant mobile access.
+  - **Configurable Default Profile**: Added `MENU_PROFILE=mixed|daily|dev` environment setting with tolerant aliases.
+  - **Chat De-noising**: Eliminated redundant confirmation chatter ("Controls ready." / "Controls updated.") when adjusting controls or opening menus.
+  - **Promoted Session Resume**: Replaced standalone quota button with direct resume launcher on the primary menu and streamlined session pickers (#44).
+- **Enhanced Media Detection & Storage Isolation**:
+  - Detects explicit `MEDIA:` tags and saved-to path labels in model responses for automatic outbound delivery (#44).
+  - Permits local media deliveries from dedicated state directories (`/var/lib/agy-telegram`, `brain/`).
+- **Performance & Voice Enhancements**:
+  - **Non-blocking Whisper Warmup**: Preloads local Whisper CLI and Python dependencies asynchronously at startup to eliminate latency on first voice note.
+  - **Immediate Typing Feedback**: Sends native Telegram `typing` action immediately upon receiving user prompts and renews it after progress message updates.
+  - **Single-Line Compact Progress**: Progress banner shows a streamlined single-line summary (`AGY is working... (Xs · Model · step)`) in `verbose: compact` mode.
+  - **Workspace Propagation**: Automatically passes active workspace into `--add-dir` for all AGY CLI executions.
+
+### Fixed
+- **Large Response Delivery**: Responses are formatted directly in chat as cleanly chunked Telegram HTML instead of forcing download of raw `.md` attachments.
+- **Documentation Cleanup**: Removed residual Option A references from README (#38).
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
@@ -172,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standalone AGY Telegram gateway
 - TypeScript migration
 
+[0.6.0]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ardiannurcahya/antigravity-cli-telegram-bot/compare/v0.2.0...v0.3.1
