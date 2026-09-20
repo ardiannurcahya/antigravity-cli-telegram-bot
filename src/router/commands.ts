@@ -27,6 +27,8 @@ import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecases/self-update.js";
 import { resolveWorkspacePath } from "../domain/workspace.js";
+import { handleDiffCommand } from "../usecases/diff-command.js";
+import { handleTitleCommand } from "../usecases/title-command.js";
 import { escapeHtml } from "../telegram.js";
 import type { ChatId, TelegramMessage } from "../types.js";
 
@@ -559,6 +561,14 @@ command("/compact")(async ({ context, chatId, args }) => {
     kind: "compact",
     prompt: args.length > 0 ? args.join(" ") : undefined,
   });
+});
+
+command("/diff")(async ({ context, chatId }) => {
+  await handleDiffCommand(context, chatId);
+});
+
+command("/title", "/rename")(async ({ context, chatId, args }) => {
+  await handleTitleCommand(context, chatId, args.join(" "));
 });
 
 command("/agy-confirm")(async ({ context, chatId }) => {

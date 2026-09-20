@@ -237,4 +237,27 @@ export class ConversationDatabase {
       db?.close();
     }
   }
+
+  public updateConversationTitle(conversationId: string, title: string): boolean {
+    if (!DatabaseSyncClass || !conversationId || !isUuid(conversationId)) return false;
+    let db: any = null;
+    try {
+      const dir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      db = new DatabaseSyncClass(this.dbPath);
+      this.ensureTable(db);
+      const cleanTitle = title.trim();
+      const stmt = db.prepare(`
+        UPDATE conversation_summaries
+        SET title = ?, preview = ?
+        WHERE conversation_id = ?;
+      `);
+      stmt.run(cleanTitle, cleanTitle, conversationId);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      db?.close();
+    }
+  }
 }

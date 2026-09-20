@@ -25,6 +25,14 @@ export function sessionKeyForMessage(message: TelegramMessage): string {
   return message.message_thread_id ? `${message.chat.id}:${message.message_thread_id}` : String(message.chat.id);
 }
 
+/** Native AGY prompt directives allowed to pass directly to the runner. */
+export const PROMPT_DIRECTIVES = new Set([
+  "plan",
+  "boost",
+  "goal",
+  "grill-me",
+]);
+
 export async function handleUpdate(context: AppContext, update: TelegramUpdate): Promise<void> {
   try {
     if (update.callback_query) { await handleCallback(context, update.callback_query); return; }
@@ -278,7 +286,13 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       enqueueJob(context, sessionKey, { kind: "usage" });
       return;
     }
-    if (text.startsWith("/")) { await reply(context, sessionKey, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, sessionKey))); return; }
+    if (text.startsWith("/")) {
+      const directive = command.startsWith("/") ? command.slice(1) : "";
+      if (!PROMPT_DIRECTIVES.has(directive)) {
+        await reply(context, sessionKey, "Unknown command. Use /menu.", createMainKeyboard(settingsFor(context, sessionKey)));
+        return;
+      }
+    }
     void context.telegram.sendChatAction(sessionKey, "typing").catch(() => undefined);
     enqueueJob(context, sessionKey, {
       prompt: text,
