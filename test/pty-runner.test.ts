@@ -151,6 +151,8 @@ test("parseContextMetrics extracts token count and percentage", () => {
   const metrics = parseContextMetrics("/context Visualize current context usage\n└ Context Usage\n◉ ◉ ◉     Gemini 3.6 Flash (High) · 146.3k/1.0M tokens\n□ □ □     (14.0%)\n□ □ □     Token usage by category");
   assert.equal(metrics.tokens, "146.3k");
   assert.equal(metrics.percentage, 14);
+  assert.equal(metrics.currentTokens, 146300);
+  assert.equal(metrics.maxTokens, 1000000);
 });
 
 test("parseContextMetrics calculates percentage from token fraction and ignores breakdown percentages", () => {
@@ -167,6 +169,17 @@ Token breakdown
   const metrics = parseContextMetrics(output);
   assert.equal(metrics.tokens, "212.2k");
   assert.equal(metrics.percentage, 21);
+  assert.equal(metrics.currentTokens, 212200);
+  assert.equal(metrics.maxTokens, 1000000);
+});
+
+test("parseContextMetrics parses comma-separated exact token values", () => {
+  const output = "· 2,205 / 1,000,000 tokens (0%)";
+  const metrics = parseContextMetrics(output);
+  assert.equal(metrics.tokens, "2,205");
+  assert.equal(metrics.currentTokens, 2205);
+  assert.equal(metrics.maxTokens, 1000000);
+  assert.equal(metrics.percentage, 0);
 });
 
 test("parseContextMetrics returns empty object when metrics missing", () => {

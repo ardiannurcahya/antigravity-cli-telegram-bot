@@ -211,6 +211,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
   let usage: Usage | null = null;
   let lastStepUsage: Usage | null = null;
   let durationMs: number | null = null;
+  let sessionDurationMs: number | null = null;
   let numTurns: number | null = null;
   let toolCalls = 0;
   let executionError = "";
@@ -253,6 +254,11 @@ export function parseStreamOutput(stdout: string): AgyResult {
         currentStepIndex = stepIndex;
       }
 
+      if (step?.duration_seconds != null) {
+        const parsedStepDuration = numberOrNull(step.duration_seconds, (value) => value * 1000);
+        if (parsedStepDuration != null) durationMs = parsedStepDuration;
+      }
+
       const stepUsage = normalizeUsage(step?.usage);
       if (stepUsage) {
         usage = stepUsage;
@@ -273,7 +279,8 @@ export function parseStreamOutput(stdout: string): AgyResult {
       model ||= stringValue(result?.model);
       response = pickText(result) || response;
       usage = normalizeUsage(result?.usage) || usage;
-      durationMs = numberOrNull(result?.duration_seconds, (value) => value * 1000);
+      sessionDurationMs = numberOrNull(result?.duration_seconds, (value) => value * 1000);
+      durationMs ??= sessionDurationMs;
       numTurns = numberOrNull(result?.num_turns);
       if (Number.isSafeInteger(result?.tool_calls)) toolCalls = result?.tool_calls as number;
       executionError ||= pickError(result);
@@ -321,6 +328,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
     usage,
     activeInputTokens: lastStepUsage?.input_tokens ?? usage?.input_tokens ?? null,
     durationMs,
+    sessionDurationMs,
     numTurns,
     toolCalls,
     status: stringValue(asRecord(finalEvent?.result)?.status),
@@ -472,7 +480,12 @@ export function runAgy(config: AgyConfig, prompt: string, conversationId: string
       }
       if (callbackError) return finish(reject as (value: never) => void, callbackError as never);
       const result = outputFormat === "stream-json" ? parseStreamOutput(stdout) : parseJsonOutput(stdout);
-      finish(resolve as (value: never) => void, { ...result, durationMs: result.durationMs ?? Date.now() - startedAt } as never);
+      const runDurationMs = Date.now() - startedAt;
+      finish(resolve as (value: never) => void, {
+        ...result,
+        durationMs: runDurationMs,
+        sessionDurationMs: result.sessionDurationMs ?? runDurationMs,
+      } as never);
     });
   });
 }
@@ -481,8 +494,25 @@ function parseJsonOutput(stdout: string): AgyResult {
   try {
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
     const normUsage = normalizeUsage(parsed.usage);
-    return { text: pickText(parsed) || JSON.stringify(parsed, null, 2), intermediateText: null, parsed, events: [], conversationId: extractConversationId(parsed), model: stringValue(parsed.model), usage: normUsage, activeInputTokens: normUsage?.input_tokens ?? null, durationMs: numberOrNull(parsed.duration_seconds, (value) => value * 1000), numTurns: numberOrNull(parsed.num_turns), toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0, status: stringValue(parsed.status) };
-  } catch { return { text: stdout.trim() || "AGY returned no output.", intermediateText: null, parsed: null, events: [], conversationId: null, model: null, usage: null, activeInputTokens: null, durationMs: null, numTurns: null, toolCalls: 0, status: null }; }
+    const sessionDurationMs = numberOrNull(parsed.duration_seconds, (value) => value * 1000);
+    return {
+      text: pickText(parsed) || JSON.stringify(parsed, null, 2),
+      intermediateText: null,
+      parsed,
+      events: [],
+      conversationId: extractConversationId(parsed),
+      model: stringValue(parsed.model),
+      usage: normUsage,
+      activeInputTokens: normUsage?.input_tokens ?? null,
+      durationMs: sessionDurationMs,
+      sessionDurationMs,
+      numTurns: numberOrNull(parsed.num_turns),
+      toolCalls: Number.isSafeInteger(parsed.tool_calls) ? parsed.tool_calls as number : 0,
+      status: stringValue(parsed.status),
+    };
+  } catch {
+    return { text: stdout.trim() || "AGY returned no output.", intermediateText: null, parsed: null, events: [], conversationId: null, model: null, usage: null, activeInputTokens: null, durationMs: null, sessionDurationMs: null, numTurns: null, toolCalls: 0, status: null };
+  }
 }
 
 function pickText(value: Record<string, unknown> | undefined): string {

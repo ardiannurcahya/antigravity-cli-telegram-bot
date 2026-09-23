@@ -6,11 +6,12 @@ import { controllerKey } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { modelLabel, getActiveModels } from "../models.js";
 import type { QueueJob } from "../queue.js";
-import { escapeHtml, findReferencedMediaFiles } from "../telegram.js";
+import { escapeHtml, findReferencedMediaFiles, formatTelegramHtml } from "../telegram.js";
 import { formatStepUpdate, runAgy } from "../agy-runner.js";
-import { parseContext, parseContextMetrics, parseCredits, parseUsageQuota, runPtyCommand } from "../pty-runner.js";
+import { parseContext, parseContextMetrics, parseCredits, parseUsageQuota, parseTokenValue, runPtyCommand } from "../pty-runner.js";
 import { settingsFor } from "../domain/settings.js";
 import { addUsage, formatTokenCount } from "../domain/usage-math.js";
+import { buildTelemetryQuoteBlock } from "../domain/telemetry.js";
 import { reply, replyWithFormattedResponse, replyWithHtml } from "../ui/reply.js";
 import { usageText } from "../ui/messages.js";
 import { contextActionsKeyboard } from "../ui/inline-keyboards.js";
@@ -297,10 +298,15 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const initialTitle = (job.prompt ? job.prompt.replace(/\s+/g, " ").slice(0, 60).trim() : "") || "Conversation";
     const convTitle = latestSession?.conversationTitle || initialTitle;
     const stepCount = (latestSession?.conversationStepCount || 0) + (result.numTurns || 1);
-    const activeTokens = result.activeInputTokens ?? result.usage?.input_tokens ?? result.usage?.total_tokens;
-    const formattedTokens = formatTokenCount(activeTokens);
+    const localPromptTokens = (result.usage?.cache_read_tokens ?? 0) + (result.usage?.input_tokens ?? 0);
+    const initialActiveTokens = localPromptTokens > 0
+      ? localPromptTokens
+      : (result.activeInputTokens ?? result.usage?.input_tokens ?? result.usage?.total_tokens);
+    const formattedTokens = formatTokenCount(initialActiveTokens);
     const maxTokens = getActiveModels().find((m) => m.id === (result.model || settings.model))?.maxContextWindow || 1_000_000;
-    const contextPct = activeTokens ? Math.min(100, Math.round((activeTokens / maxTokens) * 100)) : undefined;
+    const initialContextPct = initialActiveTokens ? Math.min(100, Math.round((initialActiveTokens / maxTokens) * 100)) : undefined;
+
+    const cumulativeUsage = addUsage(latestSession?.usageTotals, result.usage);
 
     await context.state.setSession(job.chatId, {
       ...(result.conversationId ? { conversationId: result.conversationId } : {}),
@@ -309,8 +315,8 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       conversationLastModifiedAt: Date.now(),
       settings: latestSession?.settings || settings,
       lastRun,
-      usageTotals: addUsage(latestSession?.usageTotals, result.usage),
-      ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: contextPct } : {}),
+      usageTotals: cumulativeUsage,
+      ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: initialContextPct } : {}),
       updatedAt: new Date().toISOString(),
     });
 
@@ -328,30 +334,133 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       });
     }
 
+    const telemetryMode = settings.telemetryPostPrompt || context.config.telegram.telemetryPostPrompt || "message";
+    const isProgressDeleted = (telemetryMode === "inline" || telemetryMode === "message" || telemetryMode === "separate" || context.config.telegram.progressMode === "delete");
+
+    let liveContextTokens: number | null = null;
+    let liveMaxTokens: number = maxTokens;
+    let livePercentage: number | undefined = undefined;
+    let probeCompleted = false;
+
+    const probeContext = async (): Promise<void> => {
+      if (probeCompleted || !effectiveConvId || isCancelled() || controller.signal.aborted) return;
+      probeCompleted = true;
+      try {
+        const output = await runPtyCommand(effectiveAgyConfig, "/context", {
+          conversationId: effectiveConvId,
+          timeoutMs: 4_000,
+          signal: controller.signal,
+        });
+        const metrics = parseContextMetrics(output);
+        if (metrics.tokens) {
+          if (metrics.currentTokens != null) {
+            liveContextTokens = metrics.currentTokens;
+          }
+          if (metrics.maxTokens != null) {
+            liveMaxTokens = metrics.maxTokens;
+          }
+          if (typeof metrics.percentage === "number") {
+            livePercentage = metrics.percentage;
+          }
+          await context.state.setSession(job.chatId, {
+            contextTokens: metrics.tokens,
+            contextPercentage: metrics.percentage,
+          });
+          await refreshActiveMenu(context, job.chatId);
+        }
+      } catch (err) {
+        console.debug(`[Telemetry] Post-prompt context probe failed: ${(err as Error).message}`);
+      }
+    };
+
+    const previousContextTokens = latestSession?.contextTokens ? parseTokenValue(latestSession.contextTokens) : null;
+
+    const getResolvedActiveMetrics = (): { tokens: number | null; max: number; pct: number | undefined; growthTokens: number | null } => {
+      let resolvedTokens: number | null = null;
+      let resolvedMax = maxTokens;
+      let resolvedPct: number | undefined = undefined;
+
+      if (liveContextTokens != null) {
+        resolvedTokens = liveContextTokens;
+        resolvedMax = liveMaxTokens;
+        resolvedPct = livePercentage;
+      } else {
+        const priorSessionTokens = latestSession?.contextTokens ? parseTokenValue(latestSession.contextTokens) : null;
+        if (priorSessionTokens != null && priorSessionTokens > 0) {
+          resolvedTokens = priorSessionTokens;
+          resolvedMax = maxTokens;
+          resolvedPct = latestSession?.contextPercentage;
+        } else {
+          const fallback = localPromptTokens > 0
+            ? localPromptTokens
+            : (result.activeInputTokens ?? result.usage?.input_tokens ?? result.usage?.total_tokens ?? null);
+          const fallbackPct = fallback ? Math.min(100, Math.round((fallback / maxTokens) * 100)) : undefined;
+          resolvedTokens = fallback;
+          resolvedMax = maxTokens;
+          resolvedPct = fallbackPct;
+        }
+      }
+
+      const growthTokens = resolvedTokens != null
+        ? (previousContextTokens != null && previousContextTokens > 0 ? resolvedTokens - previousContextTokens : resolvedTokens)
+        : null;
+
+      return { tokens: resolvedTokens, max: resolvedMax, pct: resolvedPct, growthTokens };
+    };
+
     if (progressMessage) {
-      const mode = context.config.telegram.progressMode || "full";
-      if (mode === "delete") {
+      if (isProgressDeleted) {
         await context.telegram.deleteMessage(job.chatId, progressMessage.message_id).catch(() => undefined);
-      } else if (mode === "compact") {
-        const duration = ((result.durationMs || Date.now() - startedAt) / 1000).toFixed(1);
-        const tokens = result.usage?.total_tokens ? ` · ${result.usage.total_tokens.toLocaleString()} tok` : "";
+      } else if (telemetryMode === "progress") {
+        await probeContext();
+        const resolved = getResolvedActiveMetrics();
+        const telemetryBlock = buildTelemetryQuoteBlock({
+          contextGrowthTokens: resolved.growthTokens,
+          activeTokens: resolved.tokens,
+          maxTokens: resolved.max,
+          contextPercentage: resolved.pct,
+          sessionUsageTotals: cumulativeUsage,
+          sessionTurns: stepCount,
+          inputTokens: result.usage?.input_tokens,
+          cacheReadTokens: result.usage?.cache_read_tokens,
+          thinkingTokens: result.usage?.thinking_tokens,
+          outputTokens: result.usage?.output_tokens,
+          toolCalls: result.toolCalls,
+          durationMs: result.durationMs || (Date.now() - startedAt),
+          sessionDurationMs: result.sessionDurationMs,
+          model: result.model || settings.model || "",
+        });
+        const quoteHtml = formatTelegramHtml(telemetryBlock);
         await context.telegram.editMessageText(
           job.chatId,
           progressMessage.message_id,
-          `${wsNotice}⚡ ${duration}s${tokens} · ${modelLabel(result.model || settings.model)}`,
+          `${wsNotice}${quoteHtml}`,
           undefined,
           "HTML"
         ).catch(() => undefined);
       } else {
-        const duration = ((Date.now() - startedAt) / 1000).toFixed(1);
-        const usageBlock = usageText(result.usage, result.model || settings.model);
-        await context.telegram.editMessageText(
-          job.chatId,
-          progressMessage.message_id,
-          `${wsNotice}AGY completed in ${duration}s.\nModel: ${modelLabel(result.model || settings.model)}\n${usageBlock}`,
-          undefined,
-          "HTML"
-        ).catch(() => undefined);
+        const mode = context.config.telegram.progressMode || "full";
+        if (mode === "compact") {
+          const duration = ((result.durationMs || Date.now() - startedAt) / 1000).toFixed(1);
+          const tokens = result.usage?.total_tokens ? ` · ${result.usage.total_tokens.toLocaleString()} tok` : "";
+          await context.telegram.editMessageText(
+            job.chatId,
+            progressMessage.message_id,
+            `${wsNotice}⚡ ${duration}s${tokens} · ${modelLabel(result.model || settings.model)}`,
+            undefined,
+            "HTML"
+          ).catch(() => undefined);
+        } else {
+          const duration = ((Date.now() - startedAt) / 1000).toFixed(1);
+          const usageBlock = usageText(result.usage, result.model || settings.model);
+          await context.telegram.editMessageText(
+            job.chatId,
+            progressMessage.message_id,
+            `${wsNotice}AGY completed in ${duration}s.\nModel: ${modelLabel(result.model || settings.model)}\n${usageBlock}`,
+            undefined,
+            "HTML"
+          ).catch(() => undefined);
+        }
       }
     }
     await detectAndSendGeneratedImages(context, job.chatId, result, effectiveConvId, startedAt);
@@ -374,7 +483,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       }
     }
 
-    const responsePrefix = (context.config.telegram.progressMode === "delete" && isCustomWorkspace)
+    const responsePrefix = (isProgressDeleted && isCustomWorkspace)
       ? `📁 <b>Workspace:</b> <code>${escapeHtml(settings.workspace!)}</code>\n\n`
       : "";
 
@@ -390,6 +499,28 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       formattedText = `**> 🤖 Context & delegation:**\n${quoteBlock}\n\n${result.text}`;
     }
 
+    if (telemetryMode === "inline" && result.text) {
+      await probeContext();
+      const resolved = getResolvedActiveMetrics();
+      const telemetryBlock = buildTelemetryQuoteBlock({
+        contextGrowthTokens: resolved.growthTokens,
+        activeTokens: resolved.tokens,
+        maxTokens: resolved.max,
+        contextPercentage: resolved.pct,
+        sessionUsageTotals: cumulativeUsage,
+        sessionTurns: stepCount,
+        inputTokens: result.usage?.input_tokens,
+        cacheReadTokens: result.usage?.cache_read_tokens,
+        thinkingTokens: result.usage?.thinking_tokens,
+        outputTokens: result.usage?.output_tokens,
+        toolCalls: result.toolCalls,
+        durationMs: result.durationMs || (Date.now() - startedAt),
+        sessionDurationMs: result.sessionDurationMs,
+        model: result.model || settings.model || "",
+      });
+      formattedText = formattedText ? `${formattedText}\n\n${telemetryBlock}` : telemetryBlock;
+    }
+
     const responseBody = responsePrefix ? `${responsePrefix}${formattedText}` : formattedText;
 
     const ttsMode = settings.ttsMode || context.config.tts?.mode || "off";
@@ -401,7 +532,40 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const shouldSendText = ttsMode !== "voice-only" || !shouldSendVoice;
 
     if (shouldSendText) {
-      await replyWithFormattedResponse(context, job.chatId, responseBody, createMainKeyboard(settingsFor(context, job.chatId)));
+      const isSeparateTelemetry = (telemetryMode === "message" || telemetryMode === "separate") && Boolean(result.text);
+      await replyWithFormattedResponse(
+        context,
+        job.chatId,
+        responseBody,
+        isSeparateTelemetry ? undefined : createMainKeyboard(settingsFor(context, job.chatId))
+      );
+
+      if (isSeparateTelemetry) {
+        await probeContext();
+        const resolved = getResolvedActiveMetrics();
+        const telemetryBlock = buildTelemetryQuoteBlock({
+          contextGrowthTokens: resolved.growthTokens,
+          activeTokens: resolved.tokens,
+          maxTokens: resolved.max,
+          contextPercentage: resolved.pct,
+          sessionUsageTotals: cumulativeUsage,
+          sessionTurns: stepCount,
+          inputTokens: result.usage?.input_tokens,
+          cacheReadTokens: result.usage?.cache_read_tokens,
+          thinkingTokens: result.usage?.thinking_tokens,
+          outputTokens: result.usage?.output_tokens,
+          toolCalls: result.toolCalls,
+          durationMs: result.durationMs || (Date.now() - startedAt),
+          sessionDurationMs: result.sessionDurationMs,
+          model: result.model || settings.model || "",
+        });
+        await replyWithFormattedResponse(
+          context,
+          job.chatId,
+          telemetryBlock,
+          createMainKeyboard(settingsFor(context, job.chatId))
+        );
+      }
     }
 
     if (shouldSendVoice && result.text) {
@@ -429,25 +593,9 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       }
     }
 
-    // Background telemetry probe: sync live active context tokens and refresh active menu in place
-    if (effectiveConvId && !isCancelled() && !controller.signal.aborted) {
-      try {
-        const output = await runPtyCommand(effectiveAgyConfig, "/context", {
-          conversationId: effectiveConvId,
-          timeoutMs: 10_000,
-        });
-        const metrics = parseContextMetrics(output);
-        if (metrics.tokens) {
-          await context.state.setSession(job.chatId, {
-            contextTokens: metrics.tokens,
-            contextPercentage: metrics.percentage,
-          });
-          await refreshActiveMenu(context, job.chatId);
-        }
-      } catch (err) {
-        // Silently ignore telemetry probe failures to never disrupt the user experience
-        console.debug(`[Telemetry] Post-prompt context probe failed: ${(err as Error).message}`);
-      }
+    // Background telemetry probe: sync live active context tokens if not probed yet
+    if (!probeCompleted && effectiveConvId && !isCancelled() && !controller.signal.aborted) {
+      await probeContext();
     }
   } catch (error) {
     if (isCancelled() || controller.signal.aborted || (error instanceof Error && error.message.includes("cancelled"))) {

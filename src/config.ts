@@ -39,6 +39,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       menuProfile: menuProfileFrom(env),
       allowBotUpdate: booleanFrom(env, "ALLOW_BOT_UPDATE", booleanFrom(env, "TELEGRAM_ALLOW_BOT_UPDATE", false)),
       autoInterrupt: booleanFrom(env, "TELEGRAM_AUTO_INTERRUPT", false),
+      telemetryPostPrompt: telemetryPostPromptFrom(env),
     },
     agy: {
       bin: (env.AGY_BIN || "/root/.local/bin/agy").trim(), workspace, project: (env.AGY_PROJECT || "").trim(), mode,
@@ -140,6 +141,16 @@ function menuProfileFrom(env: Record<string, string | undefined>): import("./typ
   if (["daily", "simple", "casual", "mobile"].includes(raw)) return "daily";
   if (["dev", "developer", "project", "code"].includes(raw)) return "dev";
   throw new Error(`MENU_PROFILE must be 'daily', 'dev', or 'mixed' (received: ${raw})`);
+}
+
+function telemetryPostPromptFrom(env: Record<string, string | undefined>): import("./types.js").TelemetryPostPromptMode {
+  const raw = (env.TELEMETRY_POST_PROMPT || env.TELEGRAM_TELEMETRY_POST_PROMPT)?.trim().toLowerCase();
+  if (!raw) return "message";
+  if (["message", "separate", "split", "standalone"].includes(raw)) return "message";
+  if (["progress", "bubble", "replace"].includes(raw)) return "progress";
+  if (["inline", "footer", "collapsed", "on"].includes(raw)) return "inline";
+  if (["off", "none", "disabled", "false", "0"].includes(raw)) return "off";
+  throw new Error(`TELEMETRY_POST_PROMPT must be 'message', 'inline', 'progress', or 'off' (received: ${raw})`);
 }
 
 function sttProviderFrom(env: Record<string, string | undefined>): "agy" | "whisper-local" | "gemini" | "none" {

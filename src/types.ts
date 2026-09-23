@@ -45,6 +45,7 @@ export interface ReplyKeyboardMarkup {
 export type ReplyMarkup = InlineKeyboardMarkup | ReplyKeyboardMarkup;
 
 export type MenuProfile = "daily" | "dev" | "mixed";
+export type TelemetryPostPromptMode = "inline" | "message" | "separate" | "progress" | "off";
 
 export interface SessionSettings {
   model: string | null;
@@ -52,6 +53,7 @@ export interface SessionSettings {
   mode: "plan" | "accept-edits";
   sandbox: boolean;
   menuProfile?: MenuProfile;
+  telemetryPostPrompt?: TelemetryPostPromptMode;
   agent?: string | null;
   project?: string | null;
   addDirs?: string[];
@@ -161,6 +163,7 @@ export interface AppConfig {
     menuProfile: MenuProfile;
     allowBotUpdate: boolean;
     autoInterrupt: boolean;
+    telemetryPostPrompt: TelemetryPostPromptMode;
   };
   agy: AgyConfig;
   stt: {
@@ -205,6 +208,7 @@ export interface AgyResult {
   usage: Usage | null;
   activeInputTokens?: number | null;
   durationMs: number | null;
+  sessionDurationMs?: number | null;
   numTurns: number | null;
   toolCalls: number;
   status: string | null;
