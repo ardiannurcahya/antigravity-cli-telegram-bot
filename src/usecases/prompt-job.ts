@@ -482,11 +482,6 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         }
       }
     }
-
-    const responsePrefix = (isProgressDeleted && isCustomWorkspace)
-      ? `📁 <b>Workspace:</b> <code>${escapeHtml(settings.workspace!)}</code>\n\n`
-      : "";
-
     const verbose = settings.verbose || "detailed";
     let formattedText = result.text;
     const intermediate = result.intermediateText?.trim();
@@ -521,7 +516,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       formattedText = formattedText ? `${formattedText}\n\n${telemetryBlock}` : telemetryBlock;
     }
 
-    const responseBody = responsePrefix ? `${responsePrefix}${formattedText}` : formattedText;
+    const responseBody = formattedText;
 
     const ttsMode = settings.ttsMode || context.config.tts?.mode || "off";
     const shouldSendVoice =

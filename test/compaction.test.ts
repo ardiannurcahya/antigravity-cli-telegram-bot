@@ -250,6 +250,8 @@ if (prompt.includes("Synthesize our active task state")) {
   const sent = harness.telegram.sentTexts();
   const snapshotFallback = sent.find((text) => /Handover snapshot note/i.test(text));
   assert.ok(snapshotFallback, "Snapshot fallback note must be delivered to chat");
+  assert.doesNotMatch(snapshotFallback, /&lt;b&gt;/, "Snapshot note must not leak escaped HTML tags");
+  assert.match(snapshotFallback, /<b>Handover snapshot note:<\/b>/, "Snapshot note must render bold HTML tag cleanly");
 
   fs.unlinkSync(mockScript);
   harness.cleanup();

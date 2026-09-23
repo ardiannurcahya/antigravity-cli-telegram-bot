@@ -296,7 +296,7 @@ export async function runCompactionJob(
         await replyWithFormattedResponse(
           context,
           job.chatId,
-          `📋 <b>Handover snapshot note:</b>\n\n${escapeHtml(snapshotText)}`
+          `📋 **Handover snapshot note:**\n\n${snapshotText}`
         ).catch(() => undefined);
       }
       return;
