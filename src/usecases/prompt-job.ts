@@ -20,6 +20,7 @@ import { runCompactionJob } from "./compaction.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
 import { parseChatTarget } from "../telegram/client.js";
 import { createTtsService } from "../tts/tts-service.js";
+import { defaultSubagentPoller } from "./subagent-poller.js";
 import type { StreamEvent } from "../types.js";
 
 type PtyReportKind = "usage" | "credits" | "context";
@@ -494,6 +495,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       formattedText = `**> 🤖 Context & delegation:**\n${quoteBlock}\n\n${result.text}`;
     }
 
+    if (result.subagentState?.isWaitingTurn) {
+      const role = result.subagentState.subagentRole || result.subagentState.subagentName || "Subagent";
+      const notice = `\n\n🤖 <b>Delegation in progress</b> (${role})\n<i>Analysis continues in the background. The final report will be delivered automatically here once complete.</i>`;
+      formattedText = formattedText ? `${formattedText}${notice}` : notice.trim();
+    }
+
     if (telemetryMode === "inline" && result.text) {
       await probeContext();
       const resolved = getResolvedActiveMetrics();
@@ -586,6 +593,18 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
           }
         }
       }
+    }
+
+    if (result.subagentState?.isWaitingTurn && effectiveConvId && !isCancelled() && !controller.signal.aborted) {
+      void defaultSubagentPoller.startPolling(context, {
+        chatId: job.chatId,
+        conversationId: effectiveConvId,
+        subagentRole: result.subagentState.subagentRole,
+        subagentName: result.subagentState.subagentName,
+        effectiveWorkspace,
+        settings,
+        wasVoiceInput: job.wasVoiceInput,
+      });
     }
 
     // Background telemetry probe: sync live active context tokens if not probed yet

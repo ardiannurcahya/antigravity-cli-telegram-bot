@@ -14,6 +14,7 @@ import { enqueueJob } from "../usecases/enqueue.js";
 import { refreshModels } from "../usecases/model-selection.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
+import { defaultSubagentPoller } from "../usecases/subagent-poller.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
@@ -259,6 +260,9 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
     if (command.startsWith("/") && await handleCommand(context, message, command, parts.slice(1))) return;
     const buttonText = text;
     if (buttonText === "✨ New session" || buttonText === "✨ New") {
+      context.queue?.cancelForChat(sessionKey);
+      defaultSubagentPoller.cancelPolling(sessionKey);
+      context.controllers?.get(controllerKey("subagent_poller", sessionKey))?.abort();
       await cleanupSessionTempFiles(context.config.tempDir, sessionKey);
       const isTopic = Boolean(message?.message_thread_id) || String(sessionKey).includes(":");
       await context.state.resetSession(sessionKey, true, isTopic);
@@ -266,11 +270,13 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       return;
     }
     if (buttonText === "🛑 Stop" || buttonText === "🛑 Cancel" || buttonText === "Stop" || buttonText === "Cancel") {
-      context.pendingDangerousCommands.delete(String(sessionKey));
-      context.controllers.get(controllerKey("prompt", sessionKey))?.abort();
-      context.controllers.get(controllerKey("custom", sessionKey))?.abort();
-      const result = context.queue.cancelForChat(sessionKey);
-      await reply(context, sessionKey, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, sessionKey)));
+      context.pendingDangerousCommands?.delete(String(sessionKey));
+      context.controllers?.get(controllerKey("prompt", sessionKey))?.abort();
+      context.controllers?.get(controllerKey("custom", sessionKey))?.abort();
+      context.controllers?.get(controllerKey("subagent_poller", sessionKey))?.abort();
+      defaultSubagentPoller.cancelPolling(sessionKey);
+      const result = context.queue?.cancelForChat(sessionKey);
+      await reply(context, sessionKey, `⛔ Cancelled: ${result?.removed || 0} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, sessionKey)));
       return;
     }
     if (buttonText === "🤖 Model") {

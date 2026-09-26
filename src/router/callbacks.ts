@@ -78,6 +78,7 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       await updateBot(context, chatId, messageId);
       return;
     case "new-session": {
+      context.queue?.cancelForChat(chatId);
       await cleanupSessionTempFiles(context.config.tempDir, chatId);
       const isTopic = Boolean(callback.message?.message_thread_id) || String(chatId).includes(":");
       await context.state.resetSession(chatId, true, isTopic);

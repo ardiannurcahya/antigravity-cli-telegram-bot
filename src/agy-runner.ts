@@ -197,6 +197,11 @@ export function normalizeUsage(value: unknown): Usage | null {
   return Object.keys(usage).length ? usage : null;
 }
 
+export function isWaitingResponseText(text: string): boolean {
+  if (!text) return false;
+  return /\b(wait|waiting|waits|suspends?|suspending|background|in progress|proceeding|standby|stand-by|poll|polling|subagent.*launch|invok.*subagent|delegat.*subagent)\b/i.test(text);
+}
+
 export function parseStreamOutput(stdout: string): AgyResult {
   const events: StreamEvent[] = [];
   let finalEvent: StreamEvent | null = null;
@@ -208,6 +213,10 @@ export function parseStreamOutput(stdout: string): AgyResult {
   let currentTurnText = "";
   const agentSteps: { index: number; text: string }[] = [];
   let hasEncounteredToolCall = false;
+  let hasInvokedSubagent = false;
+  let subagentRole: string | null = null;
+  let subagentName: string | null = null;
+  let hasReceivedSubagentResponse = false;
   let usage: Usage | null = null;
   let lastStepUsage: Usage | null = null;
   let durationMs: number | null = null;
@@ -238,6 +247,29 @@ export function parseStreamOutput(stdout: string): AgyResult {
       const isTool = !!(step?.tool_info || step?.subagent_info || isToolStep(stringValue(step?.step_type)));
       const stepIndex = typeof step?.step_index === "number" ? step.step_index : null;
       const stepType = stringValue(step?.step_type);
+
+      if (step?.subagent_info) {
+        hasInvokedSubagent = true;
+        const sub = asRecord(step.subagent_info);
+        subagentRole ||= stringValue(sub?.role) || stringValue(sub?.name);
+        subagentName ||= stringValue(sub?.name) || stringValue(sub?.type);
+      }
+      const tool = asRecord(step?.tool_info);
+      const toolName = stringValue(tool?.name) || stringValue(tool?.tool_name);
+      if (toolName === "invoke_subagent") {
+        hasInvokedSubagent = true;
+        const args = asRecord(tool?.parameters) || asRecord(tool?.args) || asRecord(tool?.input) || {};
+        const subagents = Array.isArray(args.Subagents) ? args.Subagents : (Array.isArray(args.subagents) ? args.subagents : []);
+        const first = asRecord(subagents[0]);
+        subagentRole ||= stringValue(first?.Role) || stringValue(first?.role);
+        subagentName ||= stringValue(first?.TypeName) || stringValue(first?.typeName) || stringValue(first?.name);
+      }
+      if (typeof stepType === "string" && /subagent|delegate/i.test(stepType)) {
+        hasInvokedSubagent = true;
+      }
+      if (hasInvokedSubagent && stepType === "system_message") {
+        hasReceivedSubagentResponse = true;
+      }
 
       if (isTool) {
         toolCalls += 1;
@@ -318,6 +350,18 @@ export function parseStreamOutput(stdout: string): AgyResult {
 
   const resolvedText = finalCleanText || (hasEncounteredToolCall && lastTurnText) || streamedResponse.trim() || (executionError ? `AGY could not complete the request.\n\n${executionError}` : "AGY returned no output.");
 
+  const isWaitingTurn =
+    resolvedText.includes("[SUBAGENT_IN_PROGRESS]") ||
+    (hasInvokedSubagent && !hasReceivedSubagentResponse && isWaitingResponseText(resolvedText)) ||
+    (isWaitingResponseText(resolvedText) && resolvedText.length < 500);
+
+  const subagentState = hasInvokedSubagent || isWaitingTurn ? {
+    hasInvokedSubagent,
+    subagentName,
+    subagentRole,
+    isWaitingTurn,
+  } : undefined;
+
   return {
     text: resolvedText,
     intermediateText: hasEncounteredToolCall && trimmedIntermediate && trimmedIntermediate !== resolvedText ? trimmedIntermediate : null,
@@ -332,6 +376,7 @@ export function parseStreamOutput(stdout: string): AgyResult {
     numTurns,
     toolCalls,
     status: stringValue(asRecord(finalEvent?.result)?.status),
+    subagentState,
   };
 }
 
@@ -342,6 +387,13 @@ export function formatStepUpdate(stepUpdate: Record<string, unknown> | undefined
     const toolName = stringValue(tool.name) || stringValue(tool.tool_name) || stringValue(tool.tool) || stringValue(stepUpdate.step_type) || "tool";
     const args = asRecord(tool.parameters) || asRecord(tool.args) || asRecord(tool.input) || {};
     const summary = stringValue(tool.toolSummary) || stringValue(tool.toolAction) || "";
+
+    if (toolName === "invoke_subagent") {
+      const subagents = Array.isArray(args.Subagents) ? args.Subagents : (Array.isArray(args.subagents) ? args.subagents : []);
+      const first = asRecord(subagents[0]);
+      const role = stringValue(first?.Role) || stringValue(first?.role) || stringValue(first?.TypeName) || stringValue(first?.typeName) || summary;
+      return role ? `🤖 Delegating to: ${role}` : "🤖 Delegating to subagent...";
+    }
 
     if (toolName === "run_command" || toolName === "bash" || toolName === "terminal" || toolName === "execute_command") {
       const cmd = stringValue(args.CommandLine) || stringValue(args.command) || stringValue(args.cmd) || summary;

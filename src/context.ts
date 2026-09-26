@@ -25,6 +25,6 @@ export interface BaseServices {
   telegram: TelegramClient;
 }
 
-export function controllerKey(scope: "prompt" | "custom", chatId: ChatId): string {
+export function controllerKey(scope: "prompt" | "custom" | "subagent_poller", chatId: ChatId): string {
   return `${scope}:${chatId}`;
 }

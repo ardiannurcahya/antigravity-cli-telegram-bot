@@ -64,6 +64,7 @@ command("/help")(async ({ context, chatId }) => {
 });
 
 command("/new")(async ({ context, chatId, message }) => {
+  context.queue?.cancelForChat(chatId);
   await cleanupSessionTempFiles(context.config.tempDir, chatId);
   const isTopic = Boolean(message?.message_thread_id) || String(chatId).includes(":");
   await context.state.resetSession(chatId, true, isTopic);
@@ -545,6 +546,7 @@ command("/cancel", "/kill", "/stop")(async ({ context, chatId }) => {
   context.pendingDangerousCommands.delete(String(chatId));
   context.controllers.get(controllerKey("prompt", chatId))?.abort();
   context.controllers.get(controllerKey("custom", chatId))?.abort();
+  context.controllers.get(controllerKey("subagent_poller", chatId))?.abort();
   const result = context.queue.cancelForChat(chatId);
   await reply(context, chatId, `⛔ Cancelled: ${result.removed} queued job(s) removed, active AGY process terminated.`, createMainKeyboard(settingsFor(context, chatId)));
 });

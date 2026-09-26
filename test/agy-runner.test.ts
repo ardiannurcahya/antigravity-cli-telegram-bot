@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildArgs, extractConversationId, formatStepUpdate, normalizeUsage, parseCommandArgs, parseStreamOutput, runAgyCommand, validateCustomArgs } from "../src/agy-runner.js";
+import { buildArgs, extractConversationId, formatStepUpdate, isWaitingResponseText, normalizeUsage, parseCommandArgs, parseStreamOutput, runAgyCommand, validateCustomArgs } from "../src/agy-runner.js";
 import type { AgyConfig } from "../src/types.js";
 
 const config: AgyConfig = { timeoutMs: 60000, project: "project", mode: "plan", model: "model", effort: "high", sandbox: true, allowSandboxDisable: false, allowDangerouslySkipPermissions: false, allowedModels: [], bin: "agy", workspace: "/tmp" , maxOutputBytes: 2000000 };
@@ -233,7 +233,72 @@ test("parseStreamOutput preserves activeInputTokens from the last LLM turn inste
   assert.equal(parsed.activeInputTokens, 21500, "Active context reflects the last LLM turn");
 });
 
+test("detects pending subagent state when turn ends waiting after invoke_subagent", () => {
+  const stdout = [
+    JSON.stringify({ event: "init", conversation_id: "conv-async", init: { model: "gemini-3.8-flash" } }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 1, step_type: "agent_response", text_delta: "I am launching the researcher." } }),
+    JSON.stringify({
+      event: "step_update",
+      step_update: {
+        step_index: 2,
+        step_type: "tool",
+        tool_info: {
+          name: "invoke_subagent",
+          parameters: { Subagents: [{ TypeName: "research", Role: "Codebase Investigator" }] },
+        },
+      },
+    }),
+    JSON.stringify({ event: "step_update", step_update: { step_index: 3, step_type: "agent_response", text_delta: "Investigation is underway in the background. Waiting for subagent to complete." } }),
+    JSON.stringify({
+      event: "result",
+      result: {
+        conversation_id: "conv-async",
+        status: "SUCCESS",
+        response: "Investigation is underway in the background. Waiting for subagent to complete.",
+      },
+    }),
+  ].join("\n");
+  const parsed = parseStreamOutput(stdout);
+  assert.equal(parsed.subagentState?.hasInvokedSubagent, true);
+  assert.equal(parsed.subagentState?.subagentRole, "Codebase Investigator");
+  assert.equal(parsed.subagentState?.subagentName, "research");
+  assert.equal(parsed.subagentState?.isWaitingTurn, true);
+});
 
+test("formats invoke_subagent tool calls with subagent role or type", () => {
+  assert.equal(
+    formatStepUpdate({
+      tool_info: {
+        name: "invoke_subagent",
+        parameters: { Subagents: [{ Role: "Security Auditor", TypeName: "auditor" }] },
+      },
+    }),
+    "🤖 Delegating to: Security Auditor"
+  );
+  assert.equal(
+    formatStepUpdate({
+      tool_info: {
+        name: "invoke_subagent",
+        parameters: { Subagents: [{ TypeName: "research" }] },
+      },
+    }),
+    "🤖 Delegating to: research"
+  );
+  assert.equal(
+    formatStepUpdate({
+      tool_info: {
+        name: "invoke_subagent",
+        parameters: {},
+      },
+    }),
+    "🤖 Delegating to subagent..."
+  );
+});
 
-
-
+test("isWaitingResponseText accurately recognizes interim waiting messages", () => {
+  assert.equal(isWaitingResponseText("Waiting for subagent response..."), true);
+  assert.equal(isWaitingResponseText("The investigation continues in the background, suspending actions."), true);
+  assert.equal(isWaitingResponseText("Waiting for subagent completion."), true);
+  assert.equal(isWaitingResponseText("Here is the final answer: All tests pass."), false);
+  assert.equal(isWaitingResponseText(""), false);
+});

@@ -106,6 +106,17 @@ export interface SessionState {
   lastMenuMessageId?: number;
   activeMenuScreen?: string;
   updatedAt?: string;
+  pendingSubagentPoll?: PendingSubagentPoll | null;
+}
+
+export interface PendingSubagentPoll {
+  conversationId: string;
+  subagentRole?: string | null;
+  subagentName?: string | null;
+  startedAt: number;
+  lastPollAt: number;
+  attempts: number;
+  statusMessageId?: number;
 }
 
 export interface ConversationSummary {
@@ -118,13 +129,15 @@ export interface ConversationSummary {
 
 export interface InFlightJob {
   prompt?: string;
-  kind?: "prompt" | "usage" | "credits" | "context" | "compact";
+  kind?: "prompt" | "usage" | "credits" | "context" | "compact" | "subagent_poll";
   imagePath?: string;
   documentPath?: string;
   documentName?: string;
   mediaPath?: string;
   mediaType?: string;
   startedAt: number;
+  subagentRole?: string | null;
+  conversationId?: string | null;
 }
 
 export interface PersistedState {
@@ -198,6 +211,13 @@ export interface StreamEvent extends Record<string, unknown> {
   result?: Record<string, unknown>;
 }
 
+export interface SubagentPendingState {
+  hasInvokedSubagent: boolean;
+  subagentName?: string | null;
+  subagentRole?: string | null;
+  isWaitingTurn: boolean;
+}
+
 export interface AgyResult {
   text: string;
   intermediateText?: string | null;
@@ -212,6 +232,7 @@ export interface AgyResult {
   numTurns: number | null;
   toolCalls: number;
   status: string | null;
+  subagentState?: SubagentPendingState;
 }
 
 export interface RunnerOptions {

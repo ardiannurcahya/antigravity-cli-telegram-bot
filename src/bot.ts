@@ -9,6 +9,7 @@ import { settingsFor } from "./domain/settings.js";
 import { refreshModels } from "./usecases/model-selection.js";
 import { enqueueJob } from "./usecases/enqueue.js";
 import { runPromptJob } from "./usecases/prompt-job.js";
+import { defaultSubagentPoller } from "./usecases/subagent-poller.js";
 import { restartNoticePath } from "./usecases/self-update.js";
 import { handleUpdate } from "./router/updates.js";
 import { cleanupStaleTempFiles } from "./usecases/session-cleanup.js";
@@ -25,6 +26,8 @@ export function createAppServices(base: BaseServices): AppContext {
     onCancel: (chatId) => {
       services.controllers.get(controllerKey("prompt", chatId))?.abort();
       services.controllers.get(controllerKey("custom", chatId))?.abort();
+      services.controllers.get(controllerKey("subagent_poller", chatId))?.abort();
+      defaultSubagentPoller.cancelPolling(chatId);
     },
   });
   services.queue = queue;
@@ -107,7 +110,28 @@ export async function resumeInterruptedJobs(context: AppContext): Promise<void> 
   if (Object.keys(interrupted).length > 0) {
     await context.state.clearAllInFlight();
     for (const [chatId, job] of Object.entries(interrupted)) {
-      if (job.prompt || job.kind === "usage" || job.kind === "credits" || job.kind === "context") {
+      if (job.kind === "subagent_poll" && job.conversationId) {
+        const remainingMs = 300_000 - (Date.now() - job.startedAt);
+        if (remainingMs > 10_000) {
+          const settings = settingsFor(context, chatId);
+          const effectiveWorkspace = settings.workspace || context.config.agy.workspace;
+          await context.telegram.sendMessage(
+            chatId,
+            `⚡ <b>AGY Gateway restarted</b>\n\nResuming background subagent monitoring...`,
+            createMainKeyboard(settingsFor(context, chatId)),
+            "HTML"
+          ).catch(() => undefined);
+
+          void defaultSubagentPoller.startPolling(context, {
+            chatId,
+            conversationId: job.conversationId,
+            subagentRole: job.subagentRole,
+            effectiveWorkspace,
+            settings,
+            maxDurationMs: remainingMs,
+          });
+        }
+      } else if (job.prompt || job.kind === "usage" || job.kind === "credits" || job.kind === "context" || job.kind === "compact") {
         const promptSnippet = job.prompt ? ` (Prompt: <i>"${escapeHtml(job.prompt.slice(0, 60))}${job.prompt.length > 60 ? "..." : ""}"</i>)` : "";
         await context.telegram.sendMessage(
           chatId,
@@ -117,7 +141,7 @@ export async function resumeInterruptedJobs(context: AppContext): Promise<void> 
         ).catch(() => undefined);
 
         enqueueJob(context, chatId, {
-          kind: job.kind || "prompt",
+          kind: (job.kind as "prompt" | "usage" | "credits" | "context" | "compact") || "prompt",
           prompt: job.prompt,
           imagePath: job.imagePath,
           documentPath: job.documentPath,
