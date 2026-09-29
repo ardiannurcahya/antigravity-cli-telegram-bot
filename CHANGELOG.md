@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-29
+
+### Added
+- **Autonomous Subagent Background Poller (`SubagentPoller`)**:
+  - Automatically tracks background subagent tasks spawned by the Antigravity CLI via message inbox detection in `brain/<conversationId>/.system_generated/messages` (#52).
+  - Multi-turn polling with progressive backoff intervals (`10s`..`30s`) and seamless final response synthesis once delegated tasks finish.
+  - **Hardened Cancel Lifecycle**: `/cancel`, `/stop`, and `/kill` interrupt active CLI/PTY executions as well as running background subagent pollers.
+- **Phase 1 Prompt Directives & CLI Parity**:
+  - Direct execution support for prompt directives: `/plan`, `/boost`, `/goal`, and `/grill-me` without command rejection or false unknown command alerts (#48).
+  - **Adaptive `/diff` Command**: Real-time git status and formatted code diff inspector for the active workspace.
+  - **Active Session Renaming (`/title`, `/rename`)**: Instant session title updates synchronized across in-memory state and the SQLite conversation database.
+- **Post-Prompt Expandable Telemetry**:
+  - Compact collapsible telemetry block (`<blockquote expandable>`) appended to final responses (#47, #50).
+  - Reports turn latency, session duration, token breakdown (input, output, thinking, cache hit rate), context saturation percentage, and tool execution counts.
+  - Configurable display modes via `TELEMETRY_POST_PROMPT=message|inline|progress|off`.
+
+### Fixed
+- **Clean Final Output**: Removed residual workspace banner leaks from completed response messages (#51).
+- **Internationalization**: Purged residual non-English terms across subagent modules (#52).
+
 ## [0.6.0] - 2026-09-16
+
 
 ### Added
 - **Orchestrator-Level Context Compaction (`/compact`)**:

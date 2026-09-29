@@ -273,8 +273,15 @@ system prefix.
 | `/new-project on\|off` | Toggle `--new-project` for future prompts. |
 | `/disable-slash-commands on\|off` | Toggle `--disable-slash-commands` for future prompts. |
 | `/workspace [NAME\|PATH\|clear]` | Show active workspace, switch to a project directory, or reset to default. |
+| `/diff` | Show git status and unified diff for the active workspace repository. |
+| `/title [TITLE]` | Rename the active conversation session title (alias: `/rename`). |
+| `/plan PROMPT` | Execute prompt using AGY planning directive (creates architecture/plan first). |
+| `/boost PROMPT` | Execute prompt with AGY boost reasoning directive. |
+| `/goal PROMPT` | Execute prompt with AGY long-running autonomous goal directive. |
+| `/grill-me PROMPT` | Interactive design alignment and clarification directive. |
 | `/stt [provider\|model\|lang]` | Configure Speech-to-Text provider (`whisper-local`, `gemini`, `agy`), model, or language. |
 | `/tts [mode\|voice]` | Configure Text-to-Speech playback mode (`off`, `auto`, `voice-only`, `voice-and-text`) or voice. |
+
 
 Any other text is treated as an AGY prompt. `/agy` accepts the complete
 non-interactive flag surface shown by `agy --help`, including repeatable
@@ -476,7 +483,10 @@ following variables are supported:
 | `AGY_TIMEOUT_MS` | `1800000` | Maximum AGY runtime in milliseconds. |
 | `AGY_MAX_OUTPUT_BYTES` | `20000000` | Maximum captured AGY output. |
 | `MAX_QUEUE_SIZE` | `8` | Maximum queued prompts across chats. |
+| `MENU_PROFILE` | `mixed` | Default /menu layout profile: `mixed`, `daily`, or `dev`. |
+| `TELEMETRY_POST_PROMPT` | `message` | Post-prompt telemetry block mode: `message`, `inline`, `progress`, or `off`. |
 | `STATE_FILE` | `/var/lib/agy-telegram/state.json` | Persistent offset, sessions, settings, and usage. |
+
 | `TEMP_DIR` | `/var/lib/agy-telegram/tmp` | Runtime temporary directory. |
 | `LOG_LEVEL` | `info` | Reserved logging-level setting. |
 | `STT_PROVIDER` | `none` | Speech-to-Text provider: `whisper-local`, `gemini`, `agy`, or `none`. |
