@@ -171,7 +171,7 @@ export function mainInlineKeyboard(context?: AppContext, chatId?: ChatId): Inlin
         [button("📁 Workspace", "menu:workspace"), button("📂 Resume Session", "menu:resume")],
         [button("⚙️ Mode (Plan/Edit)", "menu:mode"), button("🛡️ Sandbox", "menu:sandbox")],
         [button("🤖 Model", "menu:models"), button("🧠 Effort", "menu:effort")],
-        [button("🛠️ CLI Options", "menu:cli"), button(contextButtonLabel(session), "action:context")],
+        [button("🛠️ CLI & Tools", "menu:clitools"), button(contextButtonLabel(session), "action:context")],
         [profileBtn, closeBtn],
       ],
     };
@@ -204,8 +204,9 @@ export function cliToolsKeyboard(context: AppContext, chatId: ChatId): InlineKey
   return {
     inline_keyboard: [
       [button("⚙️ Mode & Sandbox", "menu:modesandbox"), button("🛠️ CLI Options", "menu:cli")],
-      [button("AGY Agents", "cli:agents"), button(contextButtonLabel(session), "action:context")],
-      [button("🧩 Plugins", "menu:plugins"), button("Custom /agy", "menu:custom")],
+      [button("AGY Agents", "cli:agents"), button("⚡ Skills", "cli:skills")],
+      [button("🧩 Plugins", "menu:plugins"), button("🛠️ MCP", "menu:mcp")],
+      [button(contextButtonLabel(session), "action:context"), button("Custom /agy", "menu:custom")],
       [button("Changelog", "cli:changelog"), button("CLI Help", "cli:help")],
       [button("CLI Version", "cli:version"), button("Update CLI", "cli:update")],
       [button("🔄 Update Bot", "action:update_bot"), button("💾 Set as Default", "action:setdefault")],

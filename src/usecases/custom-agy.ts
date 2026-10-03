@@ -9,8 +9,10 @@ import type { ChatId } from "../types.js";
 export function isDangerousCustomCommand(args: string[]): boolean {
   const subcommand = args[0];
   const pluginAction = ["install", "uninstall", "enable", "disable", "import", "link"].includes(args[1] || "");
+  const mcpAction = ["add", "remove", "enable", "disable"].includes(args[1] || "");
   return args.includes("--dangerously-skip-permissions") || subcommand === "update" || subcommand === "install" ||
-    ((subcommand === "plugin" || subcommand === "plugins") && pluginAction);
+    ((subcommand === "plugin" || subcommand === "plugins") && pluginAction) ||
+    (subcommand === "mcp" && mcpAction);
 }
 
 function customArgsForExecution(context: AppContext, args: string[]): string[] {
@@ -33,7 +35,7 @@ export async function runCustomAgy(context: AppContext, chatId: ChatId, args: st
   }
   if (isDangerousCustomCommand(args) && !confirmed) {
     context.pendingDangerousCommands.set(String(chatId), args);
-    await reply(context, chatId, `This command can change the AGY installation, plugins, or permission policy:\n\nagy ${args.join(" ")}\n\nSend /agy-confirm to execute it, or /cancel to discard it.`, createMainKeyboard(settingsFor(context, chatId)));
+    await reply(context, chatId, `This command can change the AGY installation, plugins, MCP servers, or permission policy:\n\nagy ${args.join(" ")}\n\nSend /agy-confirm to execute it, or /cancel to discard it.`, createMainKeyboard(settingsFor(context, chatId)));
     return;
   }
   const executionArgs = customArgsForExecution(context, args);

@@ -22,6 +22,7 @@ import {
   ttsKeyboard,
   ttsModeKeyboard,
   ttsVoiceKeyboard,
+  button,
   verboseKeyboard,
   voiceSettingsKeyboard,
   workspaceKeyboard,
@@ -30,6 +31,8 @@ import { resumeMessageText, sessionText, settingsText } from "./messages.js";
 import { reply, replyWithHtml } from "./reply.js";
 import { enqueueJob } from "../usecases/enqueue.js";
 import { refreshModels } from "../usecases/model-selection.js";
+import { handleSkillsCommand } from "../usecases/skills-command.js";
+import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { settingsFor } from "../domain/settings.js";
 import type { ChatId, InlineKeyboardMarkup } from "../types.js";
 
@@ -87,19 +90,31 @@ export async function showResumeMenu(context: AppContext, chatId: ChatId, page =
   }
 }
 
-export type CliCommand = "models" | "agents" | "changelog" | "plugins" | "help" | "version";
-export const CLI_COMMANDS: CliCommand[] = ["models", "agents", "changelog", "plugins", "help", "version"];
+export type CliCommand = "models" | "agents" | "changelog" | "plugins" | "help" | "version" | "mcp" | "skills";
+export const CLI_COMMANDS: CliCommand[] = ["models", "agents", "changelog", "plugins", "help", "version", "mcp", "skills"];
 
 export function cliCommandArgs(command: CliCommand): string[] {
   if (command === "models") return ["models"];
   if (command === "agents") return ["agents"];
   if (command === "changelog") return ["changelog"];
   if (command === "plugins") return ["plugins", "list"];
+  if (command === "mcp") return ["mcp", "list"];
+  if (command === "skills") return ["--print", "/skills"];
   if (command === "version") return ["--version"];
   return ["--help"];
 }
 
 export async function cliOutput(context: AppContext, chatId: ChatId, messageId: number, command: CliCommand): Promise<void> {
+  if (command === "skills") {
+    await context.telegram.editMessageText(chatId, messageId, "Loading AGY skills...");
+    await handleSkillsCommand(context, chatId, undefined, messageId);
+    return;
+  }
+  if (command === "mcp") {
+    await context.telegram.editMessageText(chatId, messageId, "Reading MCP servers...");
+    await handleMcpCommand(context, chatId, messageId);
+    return;
+  }
   await context.telegram.editMessageText(chatId, messageId, `Running agy ${cliCommandArgs(command).join(" ")}...`);
   try {
     const output = await runAgyCommand(context.config.agy, cliCommandArgs(command));
@@ -148,6 +163,24 @@ export async function showMenu(context: AppContext, chatId: ChatId, messageId: n
   if (kind === "output") return context.telegram.editMessageText(chatId, messageId, "Select the output format used by future normal prompts:", outputFormatKeyboard(context, chatId));
   if (kind === "custom") return context.telegram.editMessageText(chatId, messageId, "Custom AGY command\n\nUse /agy followed by any non-interactive AGY arguments. Example:\n/agy --print \"Explain this project\" --output-format text\n\nInteractive TTY mode is unavailable through Telegram.", backKeyboard());
   if (kind === "plugins") return context.telegram.editMessageText(chatId, messageId, "Plugin commands\n\nRead-only:\n/agy plugin list\n\nMutating commands require /agy-confirm after the bot asks for confirmation:\n/agy plugin install NAME\n/agy plugin uninstall NAME\n/agy plugin enable NAME\n/agy plugin disable NAME\n/agy update", backKeyboard());
+  if (kind === "mcp") {
+    return context.telegram.editMessageText(
+      chatId,
+      messageId,
+      "<b>MCP Servers (Model Context Protocol)</b>\n\nRead-only:\n• <code>/mcp</code> or <code>/agy mcp list</code>\n\nMutating commands (require confirmation via /agy-confirm):\n• <code>/agy mcp enable &lt;name&gt;</code>\n• <code>/agy mcp disable &lt;name&gt;</code>\n• <code>/agy mcp add &lt;name&gt; &lt;command&gt;</code>\n• <code>/agy mcp remove &lt;name&gt;</code>",
+      {
+        inline_keyboard: [
+          [button("📋 List MCP Servers", "cli:mcp")],
+          [button("‹ Back", "menu:clitools")],
+        ],
+      },
+      "HTML"
+    );
+  }
+  if (kind === "skills") {
+    await handleSkillsCommand(context, chatId, undefined, messageId);
+    return;
+  }
   if (kind === "profile") {
     const current = settingsFor(context, chatId).menuProfile || "mixed";
     return context.telegram.editMessageText(chatId, messageId, `<b>Menu Profile</b>\n\nChoose the interface density and button layout for <code>/menu</code>:\n\n• <b>Mixed</b>: Balanced 4-row layout (default)\n• <b>Daily</b>: Minimalist 3-row layout for fast chat & voice\n• <b>Dev</b>: 5-row layout with Workspace, Modes, CLI & Context`, menuProfileKeyboard(current), "HTML");

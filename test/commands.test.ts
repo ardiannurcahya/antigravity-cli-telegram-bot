@@ -6,7 +6,7 @@ const REGISTERED_COMMANDS = [
   "status", "cancel", "model", "effort", "mode", "sandbox", "verbose", "savedefault", "session",
   "learn", "help", "agents", "agent", "project", "add_dir", "output_format", "json_schema",
   "log_file", "print_timeout", "continue", "new_project", "disable_slash_commands",
-  "changelog", "plugins", "cli_help", "version", "update", "restart", "compact", "diff", "title", "rename", "agy", "agy_confirm"
+  "changelog", "plugins", "skills", "mcp", "cli_help", "version", "update", "restart", "compact", "diff", "title", "rename", "agy", "agy_confirm"
 ];
 
 // List of all commands handled in src/index.ts
@@ -15,7 +15,7 @@ const HANDLED_COMMANDS = new Set([
   "/sandbox", "/verbose", "/savedefault", "/setdefault", "/agent", "/project", "/add-dir", "/output-format", "/json-schema",
   "/log-file", "/print-timeout", "/resume", "/sessions", "/continue",
   "/new-project", "/disable-slash-commands", "/agents", "/changelog",
-  "/plugins", "/cli-help", "/version", "/session", "/learn", "/usage", "/quota",
+  "/plugins", "/skills", "/mcp", "/cli-help", "/version", "/session", "/learn", "/usage", "/quota",
   "/credits", "/context", "/tokens", "/status", "/cancel", "/update", "/restart", "/compact", "/diff", "/title", "/rename", "/agy-confirm"
 ]);
 

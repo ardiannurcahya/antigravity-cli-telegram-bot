@@ -29,6 +29,8 @@ import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecas
 import { resolveWorkspacePath } from "../domain/workspace.js";
 import { handleDiffCommand } from "../usecases/diff-command.js";
 import { handleTitleCommand } from "../usecases/title-command.js";
+import { handleSkillsCommand } from "../usecases/skills-command.js";
+import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { escapeHtml } from "../telegram.js";
 import type { ChatId, TelegramMessage } from "../types.js";
 
@@ -511,6 +513,20 @@ command("/changelog")(async ({ context, chatId }) => {
 command("/plugins")(async ({ context, chatId }) => {
   const output = await runAgyCommand(context.config.agy, ["plugins", "list"]).catch((error) => `Could not read AGY plugins: ${(error as Error).message}`);
   await reply(context, chatId, `AGY plugins\n\n${output || "No imported plugins."}`, createMainKeyboard(settingsFor(context, chatId)));
+});
+
+command("/skills")(async ({ context, chatId, args }) => {
+  void context.telegram.sendChatAction(chatId, "typing").catch(() => undefined);
+  await handleSkillsCommand(context, chatId, args.join(" ").trim() || undefined);
+});
+
+command("/mcp")(async ({ context, chatId, args }) => {
+  if (args.length > 0 && ["add", "remove", "enable", "disable"].includes(args[0])) {
+    await runCustomAgy(context, chatId, ["mcp", ...args]);
+    return;
+  }
+  void context.telegram.sendChatAction(chatId, "typing").catch(() => undefined);
+  await handleMcpCommand(context, chatId);
 });
 
 command("/cli-help")(async ({ context, chatId }) => {

@@ -69,6 +69,8 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "disable_slash_commands", description: "Toggle AGY slash expansion" },
   { command: "changelog", description: "Show AGY changelog" },
   { command: "plugins", description: "List imported AGY plugins" },
+  { command: "skills", description: "List available AGY skills (workspace, global, built-in)" },
+  { command: "mcp", description: "List configured MCP servers" },
   { command: "cli_help", description: "Show AGY CLI help" },
   { command: "version", description: "Show AGY CLI version" },
   { command: "update", description: "Update Telegram bot from GitHub & restart" },
