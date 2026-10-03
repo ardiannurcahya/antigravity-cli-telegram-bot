@@ -273,6 +273,8 @@ system prefix.
 | `/new-project on\|off` | Toggle `--new-project` for future prompts. |
 | `/disable-slash-commands on\|off` | Toggle `--disable-slash-commands` for future prompts. |
 | `/workspace [NAME\|PATH\|clear]` | Show active workspace, switch to a project directory, or reset to default. |
+| `/skills [NAME]` | List available AGY skills (project, global, built-in) or view details of a specific skill. |
+| `/mcp [COMMAND]` | Inspect configured MCP servers or manage MCP configurations with confirmation. |
 | `/diff` | Show git status and unified diff for the active workspace repository. |
 | `/title [TITLE]` | Rename the active conversation session title (alias: `/rename`). |
 | `/plan PROMPT` | Execute prompt using AGY planning directive (creates architecture/plan first). |
