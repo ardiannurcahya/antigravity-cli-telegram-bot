@@ -29,6 +29,7 @@ import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecas
 import { resolveWorkspacePath } from "../domain/workspace.js";
 import { handleDiffCommand } from "../usecases/diff-command.js";
 import { handleTitleCommand } from "../usecases/title-command.js";
+import { handleRewindCommand } from "../usecases/rewind-command.js";
 import { handleSkillsCommand } from "../usecases/skills-command.js";
 import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { escapeHtml } from "../telegram.js";
@@ -572,6 +573,24 @@ command("/learn")(async ({ context, chatId, args }) => {
     ? `/learn ${args.join(" ")}`
     : "Please analyze our recent conversation and derive persistent rules or skills using /learn.";
   enqueueJob(context, chatId, { prompt: promptText, kind: "prompt" });
+});
+
+command("/btw")(async ({ context, chatId, args }) => {
+  const question = args.join(" ").trim();
+  if (!question) {
+    await replyWithHtml(
+      context,
+      chatId,
+      "Usage: <code>/btw &lt;side question&gt;</code>\n\nAsks AGY a side question against the current conversation without advancing it, so your next message resumes from before the aside.",
+      createMainKeyboard(settingsFor(context, chatId))
+    );
+    return;
+  }
+  enqueueJob(context, chatId, { prompt: `/btw ${question}`, kind: "prompt", ephemeral: true });
+});
+
+command("/rewind")(async ({ context, chatId, args }) => {
+  await handleRewindCommand(context, chatId, args.join(" "));
 });
 
 command("/compact")(async ({ context, chatId, args }) => {

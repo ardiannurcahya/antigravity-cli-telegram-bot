@@ -12,6 +12,13 @@ export interface QueueJob {
   mediaPath?: string;
   mediaType?: string;
   wasVoiceInput?: boolean;
+  /**
+   * When true the job resumes the current conversation but its result is NOT
+   * persisted back into the session (conversation id, title, step count and
+   * context metrics are left untouched). Used by `/btw` side questions so the
+   * next regular prompt resumes from the pre-side-question turn.
+   */
+  ephemeral?: boolean;
 }
 export interface QueueStatus { active: (QueueJob & { cancel: () => boolean }) | null; queued: number; totalQueued: number }
 type Worker = (job: QueueJob, isCancelled: () => boolean) => Promise<void>;

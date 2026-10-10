@@ -54,6 +54,8 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "session", description: "Show session settings" },
   { command: "workspace", description: "Show or change active project workspace" },
   { command: "learn", description: "Learn reusable rules/skills from recent chat" },
+  { command: "btw", description: "Ask a side question without advancing the conversation" },
+  { command: "rewind", description: "Step the active conversation back one or more turns" },
   { command: "compact", description: "Compact context and create state snapshot to save tokens" },
   { command: "help", description: "Show available commands" },
   { command: "agents", description: "List available AGY agents" },

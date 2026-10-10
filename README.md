@@ -277,6 +277,8 @@ system prefix.
 | `/mcp [COMMAND]` | Inspect configured MCP servers or manage MCP configurations with confirmation. |
 | `/diff` | Show git status and unified diff for the active workspace repository. |
 | `/title [TITLE]` | Rename the active conversation session title (alias: `/rename`). |
+| `/btw QUESTION` | Ask a side question against the current conversation without advancing it; the next message resumes from before the aside. |
+| `/rewind [N]` | Step the active conversation back `N` turns (default 1); future prompts resume from the earlier snapshot. |
 | `/plan PROMPT` | Execute prompt using AGY planning directive (creates architecture/plan first). |
 | `/boost PROMPT` | Execute prompt with AGY boost reasoning directive. |
 | `/goal PROMPT` | Execute prompt with AGY long-running autonomous goal directive. |
