@@ -23,6 +23,17 @@ import { createTtsService } from "../tts/tts-service.js";
 import { defaultSubagentPoller } from "./subagent-poller.js";
 import type { StreamEvent } from "../types.js";
 
+/**
+ * Whether a finished job should advance and persist conversation state
+ * (conversation id, title, step count, context metrics and the conversation
+ * database row). Ephemeral jobs such as `/btw` side questions run against the
+ * current conversation but intentionally do not advance it, so the next
+ * regular prompt resumes from the turn that preceded the side question.
+ */
+export function shouldAdvanceConversation(job: Pick<QueueJob, "ephemeral">): boolean {
+  return !job.ephemeral;
+}
+
 type PtyReportKind = "usage" | "credits" | "context";
 
 interface PtyReportSpec {
@@ -308,22 +319,34 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const initialContextPct = initialActiveTokens ? Math.min(100, Math.round((initialActiveTokens / maxTokens) * 100)) : undefined;
 
     const cumulativeUsage = addUsage(latestSession?.usageTotals, result.usage);
+    const advanceConversation = shouldAdvanceConversation(job);
 
-    await context.state.setSession(job.chatId, {
-      ...(result.conversationId ? { conversationId: result.conversationId } : {}),
-      conversationTitle: convTitle,
-      conversationStepCount: stepCount,
-      conversationLastModifiedAt: Date.now(),
-      settings: latestSession?.settings || settings,
-      lastRun,
-      usageTotals: cumulativeUsage,
-      ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: initialContextPct } : {}),
-      updatedAt: new Date().toISOString(),
-    });
+    if (advanceConversation) {
+      await context.state.setSession(job.chatId, {
+        ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+        conversationTitle: convTitle,
+        conversationStepCount: stepCount,
+        conversationLastModifiedAt: Date.now(),
+        settings: latestSession?.settings || settings,
+        lastRun,
+        usageTotals: cumulativeUsage,
+        ...(formattedTokens ? { contextTokens: formattedTokens, contextPercentage: initialContextPct } : {}),
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      // Ephemeral (/btw) job: record spend and telemetry but leave the
+      // resumable conversation pointer untouched.
+      await context.state.setSession(job.chatId, {
+        settings: latestSession?.settings || settings,
+        lastRun,
+        usageTotals: cumulativeUsage,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     await refreshActiveMenu(context, job.chatId);
 
-    if (effectiveConvId) {
+    if (advanceConversation && effectiveConvId) {
       context.convDb.upsertConversation({
         conversation_id: effectiveConvId,
         preview: convTitle,
@@ -363,11 +386,13 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
           if (typeof metrics.percentage === "number") {
             livePercentage = metrics.percentage;
           }
-          await context.state.setSession(job.chatId, {
-            contextTokens: metrics.tokens,
-            contextPercentage: metrics.percentage,
-          });
-          await refreshActiveMenu(context, job.chatId);
+          if (advanceConversation) {
+            await context.state.setSession(job.chatId, {
+              contextTokens: metrics.tokens,
+              contextPercentage: metrics.percentage,
+            });
+            await refreshActiveMenu(context, job.chatId);
+          }
         }
       } catch (err) {
         console.debug(`[Telemetry] Post-prompt context probe failed: ${(err as Error).message}`);

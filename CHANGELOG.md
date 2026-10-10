@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`/btw` side questions (RFC #46 Phase 3)**: Ask a side question against the current conversation without advancing it. The job resumes the active conversation but its result is not persisted, so conversation id, title, step count and context metrics are left untouched and the next regular prompt resumes from the turn that preceded the aside.
+
 ## [0.8.0] - 2026-10-03
 
 ### Added

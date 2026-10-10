@@ -574,6 +574,20 @@ command("/learn")(async ({ context, chatId, args }) => {
   enqueueJob(context, chatId, { prompt: promptText, kind: "prompt" });
 });
 
+command("/btw")(async ({ context, chatId, args }) => {
+  const question = args.join(" ").trim();
+  if (!question) {
+    await replyWithHtml(
+      context,
+      chatId,
+      "Usage: <code>/btw &lt;side question&gt;</code>\n\nAsks AGY a side question against the current conversation without advancing it, so your next message resumes from before the aside.",
+      createMainKeyboard(settingsFor(context, chatId))
+    );
+    return;
+  }
+  enqueueJob(context, chatId, { prompt: `/btw ${question}`, kind: "prompt", ephemeral: true });
+});
+
 command("/compact")(async ({ context, chatId, args }) => {
   enqueueJob(context, chatId, {
     kind: "compact",
