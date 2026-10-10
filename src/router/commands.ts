@@ -29,6 +29,7 @@ import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecas
 import { resolveWorkspacePath } from "../domain/workspace.js";
 import { handleDiffCommand } from "../usecases/diff-command.js";
 import { handleTitleCommand } from "../usecases/title-command.js";
+import { handleRewindCommand } from "../usecases/rewind-command.js";
 import { handleSkillsCommand } from "../usecases/skills-command.js";
 import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { escapeHtml } from "../telegram.js";
@@ -586,6 +587,10 @@ command("/btw")(async ({ context, chatId, args }) => {
     return;
   }
   enqueueJob(context, chatId, { prompt: `/btw ${question}`, kind: "prompt", ephemeral: true });
+});
+
+command("/rewind")(async ({ context, chatId, args }) => {
+  await handleRewindCommand(context, chatId, args.join(" "));
 });
 
 command("/compact")(async ({ context, chatId, args }) => {

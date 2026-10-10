@@ -95,6 +95,12 @@ export interface RunStats {
 
 export interface SessionState {
   conversationId?: string;
+  /**
+   * Bounded stack of the conversation ids that preceded the active one, oldest
+   * first. Each advancing turn pushes the id it resumed from, so `/rewind` can
+   * step the active conversation back to an earlier snapshot.
+   */
+  conversationHistory?: string[];
   conversationTitle?: string;
   conversationStepCount?: number;
   conversationLastModifiedAt?: number | string;

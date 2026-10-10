@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **`/btw` side questions (RFC #46 Phase 3)**: Ask a side question against the current conversation without advancing it. The job resumes the active conversation but its result is not persisted, so conversation id, title, step count and context metrics are left untouched and the next regular prompt resumes from the turn that preceded the aside.
+- **`/rewind [N]` (RFC #46 Phase 3)**: Step the active conversation back `N` turns (default 1). Each advancing turn records the conversation id it resumed from in a bounded per-session history; `/rewind` restores an earlier snapshot so future prompts continue from there.
 
 ## [0.8.0] - 2026-10-03
 

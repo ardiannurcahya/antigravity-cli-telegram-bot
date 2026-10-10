@@ -34,6 +34,22 @@ export function shouldAdvanceConversation(job: Pick<QueueJob, "ephemeral">): boo
   return !job.ephemeral;
 }
 
+/** Maximum number of prior conversation snapshots retained for `/rewind`. */
+export const REWIND_HISTORY_LIMIT = 25;
+
+/**
+ * Append the conversation id a turn resumed from to the rewind history, so the
+ * active conversation can later be stepped back to it. A no-op when the turn
+ * did not actually advance to a new conversation id.
+ */
+export function appendRewindHistory(history: string[] | undefined, previousConversationId: string | null | undefined, nextConversationId: string | null | undefined): string[] {
+  const current = history ?? [];
+  if (!previousConversationId || !nextConversationId || previousConversationId === nextConversationId) {
+    return current;
+  }
+  return [...current, previousConversationId].slice(-REWIND_HISTORY_LIMIT);
+}
+
 type PtyReportKind = "usage" | "credits" | "context";
 
 interface PtyReportSpec {
@@ -322,8 +338,10 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     const advanceConversation = shouldAdvanceConversation(job);
 
     if (advanceConversation) {
+      const updatedHistory = appendRewindHistory(latestSession?.conversationHistory, session?.conversationId, result.conversationId);
       await context.state.setSession(job.chatId, {
         ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+        conversationHistory: updatedHistory,
         conversationTitle: convTitle,
         conversationStepCount: stepCount,
         conversationLastModifiedAt: Date.now(),
