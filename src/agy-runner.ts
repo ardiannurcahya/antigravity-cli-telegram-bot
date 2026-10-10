@@ -9,20 +9,46 @@ const CONVERSATION_KEYS = new Set(["conversationId", "conversation_id", "convers
 export function buildArgs(config: AgyConfig, prompt: string, conversationId: string | null, overrides: RunnerOptions = {}): string[] {
   const effective = { ...config, ...overrides };
   const outputFormat = effective.outputFormat || "stream-json";
+  const allImagePaths = [
+    ...(overrides.imagePaths || []),
+    ...(overrides.imagePath && !(overrides.imagePaths || []).includes(overrides.imagePath) ? [overrides.imagePath] : []),
+  ];
+  const allDocPaths = [
+    ...(overrides.documentPaths || []),
+    ...(overrides.documentPath && !(overrides.documentPaths || []).includes(overrides.documentPath) ? [overrides.documentPath] : []),
+  ];
+  const allMediaPaths = [
+    ...(overrides.mediaPaths || []),
+    ...(overrides.mediaPath && !(overrides.mediaPaths || []).includes(overrides.mediaPath) ? [overrides.mediaPath] : []),
+  ];
   let finalPrompt = prompt;
-  if (overrides.imagePath) {
+
+  if (allImagePaths.length > 1) {
+    const list = allImagePaths.join(", ");
     finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Image attached: ${overrides.imagePath}]`
-      : `Please analyze this image: ${overrides.imagePath}`;
-  } else if (overrides.documentPath) {
+      ? `${prompt}\n\n[Images attached: ${list}]`
+      : `Please analyze these attached images: ${list}`;
+  } else if (allImagePaths.length === 1) {
+    const img = allImagePaths[0];
     finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Document attached: ${overrides.documentPath}]`
-      : `Please read and analyze this document: ${overrides.documentPath}`;
-  } else if (overrides.mediaPath && !prompt.includes(overrides.mediaPath)) {
-    const label = overrides.mediaType ? `${overrides.mediaType} attached` : "File attached";
+      ? `${prompt}\n\n[Image attached: ${img}]`
+      : `Please analyze this image: ${img}`;
+  } else if (allDocPaths.length > 1) {
+    const list = allDocPaths.join(", ");
     finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[${label}: ${overrides.mediaPath}]`
-      : `Please review and analyze this ${overrides.mediaType || "file"}: ${overrides.mediaPath}`;
+      ? `${prompt}\n\n[Documents attached: ${list}]`
+      : `Please read and analyze these attached documents: ${list}`;
+  } else if (allDocPaths.length === 1) {
+    const doc = allDocPaths[0];
+    finalPrompt = prompt.trim()
+      ? `${prompt}\n\n[Document attached: ${doc}]`
+      : `Please read and analyze this document: ${doc}`;
+  } else if (allMediaPaths.length > 0) {
+    const list = allMediaPaths.join(", ");
+    const label = overrides.mediaType ? `${overrides.mediaType} attached` : "Files attached";
+    finalPrompt = prompt.trim()
+      ? `${prompt}\n\n[${label}: ${list}]`
+      : `Please review and analyze these attachments: ${list}`;
   }
   const args = ["--print", finalPrompt, "--output-format", outputFormat, "--print-timeout", effective.printTimeout || `${Math.ceil(effective.timeoutMs / 1000)}s`];
   if (effective.project) args.push("--project", effective.project);
@@ -40,9 +66,9 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
   if (effective.agent) args.push("--agent", effective.agent);
   const dirs = new Set(effective.addDirs || []);
   if (effective.workspace?.trim()) dirs.add(effective.workspace.trim());
-  if (overrides.imagePath) dirs.add(path.dirname(overrides.imagePath));
-  if (overrides.documentPath) dirs.add(path.dirname(overrides.documentPath));
-  if (overrides.mediaPath) dirs.add(path.dirname(overrides.mediaPath));
+  for (const img of allImagePaths) dirs.add(path.dirname(img));
+  for (const doc of allDocPaths) dirs.add(path.dirname(doc));
+  for (const media of allMediaPaths) dirs.add(path.dirname(media));
   for (const addDir of dirs) args.push("--add-dir", addDir);
   if (effective.newProject) args.push("--new-project");
   if (effective.disableSlashCommands) args.push("--disable-slash-commands");
