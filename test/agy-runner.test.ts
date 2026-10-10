@@ -133,6 +133,19 @@ test("attaches media file reference and directory in buildArgs", () => {
   assert.ok(args.includes("/tmp/uploads"));
 });
 
+test("buildArgs does not shadow documents or audio when images are present", () => {
+  const args = buildArgs(config, "Analyze all these", null, {
+    imagePaths: ["/tmp/uploads/photo1.jpg", "/tmp/uploads/photo2.jpg"],
+    documentPaths: ["/tmp/uploads/doc.pdf"],
+    mediaPaths: ["/tmp/uploads/voice.ogg"],
+    mediaType: "Audio",
+  });
+  assert.ok(args[1].includes("Analyze all these"));
+  assert.ok(args[1].includes("[Images attached: /tmp/uploads/photo1.jpg, /tmp/uploads/photo2.jpg]"));
+  assert.ok(args[1].includes("[Document attached: /tmp/uploads/doc.pdf]"));
+  assert.ok(args[1].includes("[Audio attached: /tmp/uploads/voice.ogg]"));
+});
+
 test("isolates intermediate delegation preamble from final answer in parseStreamOutput", () => {
   const stdout = [
     JSON.stringify({ event: "init", conversation_id: "conv-sub", init: { model: "gemini-3.8-flash" } }),

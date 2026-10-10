@@ -21,34 +21,38 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
     ...(overrides.mediaPaths || []),
     ...(overrides.mediaPath && !(overrides.mediaPaths || []).includes(overrides.mediaPath) ? [overrides.mediaPath] : []),
   ];
-  let finalPrompt = prompt;
+  const attachments: string[] = [];
 
   if (allImagePaths.length > 1) {
-    const list = allImagePaths.join(", ");
-    finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Images attached: ${list}]`
-      : `Please analyze these attached images: ${list}`;
+    attachments.push(`[Images attached: ${allImagePaths.join(", ")}]`);
   } else if (allImagePaths.length === 1) {
-    const img = allImagePaths[0];
-    finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Image attached: ${img}]`
-      : `Please analyze this image: ${img}`;
-  } else if (allDocPaths.length > 1) {
-    const list = allDocPaths.join(", ");
-    finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Documents attached: ${list}]`
-      : `Please read and analyze these attached documents: ${list}`;
+    attachments.push(`[Image attached: ${allImagePaths[0]}]`);
+  }
+
+  if (allDocPaths.length > 1) {
+    attachments.push(`[Documents attached: ${allDocPaths.join(", ")}]`);
   } else if (allDocPaths.length === 1) {
-    const doc = allDocPaths[0];
-    finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[Document attached: ${doc}]`
-      : `Please read and analyze this document: ${doc}`;
-  } else if (allMediaPaths.length > 0) {
+    attachments.push(`[Document attached: ${allDocPaths[0]}]`);
+  }
+
+  if (allMediaPaths.length > 0) {
     const list = allMediaPaths.join(", ");
     const label = overrides.mediaType ? `${overrides.mediaType} attached` : "Files attached";
-    finalPrompt = prompt.trim()
-      ? `${prompt}\n\n[${label}: ${list}]`
-      : `Please review and analyze these attachments: ${list}`;
+    attachments.push(`[${label}: ${list}]`);
+  }
+
+  let finalPrompt = prompt.trim();
+  if (attachments.length > 0) {
+    const attachmentBlock = attachments.join("\n\n");
+    if (finalPrompt) {
+      finalPrompt = `${finalPrompt}\n\n${attachmentBlock}`;
+    } else if (attachments.length === 1 && allImagePaths.length === 1 && allDocPaths.length === 0 && allMediaPaths.length === 0) {
+      finalPrompt = `Please analyze this image: ${allImagePaths[0]}`;
+    } else if (attachments.length === 1 && allDocPaths.length === 1 && allImagePaths.length === 0 && allMediaPaths.length === 0) {
+      finalPrompt = `Please read and analyze this document: ${allDocPaths[0]}`;
+    } else {
+      finalPrompt = `Please analyze the attached files:\n\n${attachmentBlock}`;
+    }
   }
   const args = ["--print", finalPrompt, "--output-format", outputFormat, "--print-timeout", effective.printTimeout || `${Math.ceil(effective.timeoutMs / 1000)}s`];
   if (effective.project) args.push("--project", effective.project);
