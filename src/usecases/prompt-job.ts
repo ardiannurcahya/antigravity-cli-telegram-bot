@@ -252,9 +252,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         prompt: job.prompt,
         kind: job.kind,
         imagePath: job.imagePath,
+        imagePaths: job.imagePaths,
         documentPath: job.documentPath,
+        documentPaths: job.documentPaths,
         documentName: job.documentName,
         mediaPath: job.mediaPath,
+        mediaPaths: job.mediaPaths,
         mediaType: job.mediaType,
         startedAt: Date.now(),
       });
@@ -262,9 +265,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         ...settings,
         signal: controller.signal,
         imagePath: job.imagePath,
+        imagePaths: job.imagePaths,
         documentPath: job.documentPath,
+        documentPaths: job.documentPaths,
         documentName: job.documentName,
         mediaPath: job.mediaPath,
+        mediaPaths: job.mediaPaths,
         mediaType: job.mediaType,
         onEvent: (event: StreamEvent) => {
           lastEventReceivedAt = Date.now();

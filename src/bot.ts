@@ -146,9 +146,12 @@ export async function resumeInterruptedJobs(context: AppContext): Promise<void> 
           kind: (job.kind as "prompt" | "usage" | "credits" | "context" | "compact") || "prompt",
           prompt: job.prompt,
           imagePath: job.imagePath,
+          imagePaths: job.imagePaths,
           documentPath: job.documentPath,
+          documentPaths: job.documentPaths,
           documentName: job.documentName,
           mediaPath: job.mediaPath,
+          mediaPaths: job.mediaPaths,
           mediaType: job.mediaType,
         });
       } else {

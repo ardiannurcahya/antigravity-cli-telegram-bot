@@ -7,9 +7,12 @@ export interface QueueJob {
   id?: string;
   enqueuedAt?: number;
   imagePath?: string;
+  imagePaths?: string[];
   documentPath?: string;
+  documentPaths?: string[];
   documentName?: string;
   mediaPath?: string;
+  mediaPaths?: string[];
   mediaType?: string;
   wasVoiceInput?: boolean;
 }

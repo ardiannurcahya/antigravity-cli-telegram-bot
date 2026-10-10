@@ -35,9 +35,12 @@ export function enqueueJob(context: AppContext, chatId: ChatId, job: Partial<Que
     kind: job.kind || "prompt",
     prompt: effectivePrompt,
     imagePath: job.imagePath,
+    imagePaths: job.imagePaths,
     documentPath: job.documentPath,
+    documentPaths: job.documentPaths,
     documentName: job.documentName,
     mediaPath: job.mediaPath,
+    mediaPaths: job.mediaPaths,
     mediaType: job.mediaType,
     wasVoiceInput: job.wasVoiceInput,
   });

@@ -16,6 +16,7 @@ export interface TelegramContact { phone_number: string; first_name: string; las
 export interface TelegramMessage {
   message_id: number;
   message_thread_id?: number;
+  media_group_id?: string;
   is_topic_message?: boolean;
   chat: TelegramChat;
   from?: TelegramUser;
@@ -131,9 +132,12 @@ export interface InFlightJob {
   prompt?: string;
   kind?: "prompt" | "usage" | "credits" | "context" | "compact" | "subagent_poll";
   imagePath?: string;
+  imagePaths?: string[];
   documentPath?: string;
+  documentPaths?: string[];
   documentName?: string;
   mediaPath?: string;
+  mediaPaths?: string[];
   mediaType?: string;
   startedAt: number;
   subagentRole?: string | null;
@@ -254,8 +258,11 @@ export interface RunnerOptions {
   logFile?: string | null;
   dangerouslySkipPermissions?: boolean;
   imagePath?: string;
+  imagePaths?: string[];
   documentPath?: string;
+  documentPaths?: string[];
   documentName?: string;
   mediaPath?: string;
+  mediaPaths?: string[];
   mediaType?: string;
 }
