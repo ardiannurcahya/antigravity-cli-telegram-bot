@@ -12,6 +12,8 @@ export type CallbackAction =
   | { kind: "credits" }
   | { kind: "context" }
   | { kind: "compact" }
+  | { kind: "fork" }
+  | { kind: "rewind" }
   | { kind: "setdefault" }
   | { kind: "update-bot" }
   | { kind: "new-session" }
@@ -47,6 +49,8 @@ export function parseCallbackAction(data: string): CallbackAction | null {
   if (data === "action:credits") return { kind: "credits" };
   if (data === "action:context") return { kind: "context" };
   if (data === "action:compact") return { kind: "compact" };
+  if (data === "action:fork") return { kind: "fork" };
+  if (data === "action:rewind") return { kind: "rewind" };
   if (data === "action:setdefault") return { kind: "setdefault" };
   if (data === "action:update_bot") return { kind: "update-bot" };
   if (data === "action:new") return { kind: "new-session" };
@@ -73,6 +77,8 @@ export function serializeCallbackData(action: CallbackAction): string {
     case "credits": return "action:credits";
     case "context": return "action:context";
     case "compact": return "action:compact";
+    case "fork": return "action:fork";
+    case "rewind": return "action:rewind";
     case "setdefault": return "action:setdefault";
     case "update-bot": return "action:update_bot";
     case "new-session": return "action:new";

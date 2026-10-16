@@ -24,14 +24,19 @@ test("contextButtonLabel renders dynamic labels based on session telemetry", () 
   assert.equal(contextButtonLabel({ contextTokens: "142k", contextPercentage: 14 }), "🧠 142k (14%)");
 });
 
-test("contextActionsKeyboard generates compact and refresh action buttons", () => {
+test("contextActionsKeyboard generates compact, refresh, fork, and rewind action buttons", () => {
   const keyboard = contextActionsKeyboard();
-  assert.equal(keyboard.inline_keyboard.length, 1);
+  assert.equal(keyboard.inline_keyboard.length, 2);
   assert.equal(keyboard.inline_keyboard[0].length, 2);
   assert.equal(keyboard.inline_keyboard[0][0].text, "🗜️ Compact Context");
   assert.equal(keyboard.inline_keyboard[0][0].callback_data, "action:compact");
   assert.equal(keyboard.inline_keyboard[0][1].text, "🔄 Refresh");
   assert.equal(keyboard.inline_keyboard[0][1].callback_data, "action:context");
+  assert.equal(keyboard.inline_keyboard[1].length, 2);
+  assert.equal(keyboard.inline_keyboard[1][0].text, "🔀 Fork Session");
+  assert.equal(keyboard.inline_keyboard[1][0].callback_data, "action:fork");
+  assert.equal(keyboard.inline_keyboard[1][1].text, "⏪ Rewind 1 Turn");
+  assert.equal(keyboard.inline_keyboard[1][1].callback_data, "action:rewind");
 });
 
 test("mainInlineKeyboard in dev profile adapts label to session context telemetry", async () => {

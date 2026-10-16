@@ -13,6 +13,7 @@ export function contextActionsKeyboard(): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
       [button("🗜️ Compact Context", "action:compact"), button("🔄 Refresh", "action:context")],
+      [button("🔀 Fork Session", "action:fork"), button("⏪ Rewind 1 Turn", "action:rewind")],
     ],
   };
 }
