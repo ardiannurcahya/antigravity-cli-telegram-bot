@@ -260,4 +260,24 @@ export class ConversationDatabase {
       db?.close();
     }
   }
+
+  public markConversationKilled(conversationId: string): boolean {
+    if (!DatabaseSyncClass || !conversationId || !isUuid(conversationId) || !fs.existsSync(this.dbPath)) return false;
+    let db: any = null;
+    try {
+      db = new DatabaseSyncClass(this.dbPath);
+      this.ensureTable(db);
+      const stmt = db.prepare(`
+        UPDATE conversation_summaries
+        SET killed = 1
+        WHERE conversation_id = ?;
+      `);
+      stmt.run(conversationId);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      db?.close();
+    }
+  }
 }

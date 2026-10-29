@@ -277,6 +277,7 @@ system prefix.
 | `/mcp [COMMAND]` | Inspect configured MCP servers or manage MCP configurations with confirmation. |
 | `/diff` | Show git status and unified diff for the active workspace repository. |
 | `/title [TITLE]` | Rename the active conversation session title (alias: `/rename`). |
+| `/autotopic [on\|off]` | Toggle automatic 1-emoji forum topic renaming after Turn 1 (resets on `/new`). |
 | `/plan PROMPT` | Execute prompt using AGY planning directive (creates architecture/plan first). |
 | `/boost PROMPT` | Execute prompt with AGY boost reasoning directive. |
 | `/goal PROMPT` | Execute prompt with AGY long-running autonomous goal directive. |
@@ -487,6 +488,10 @@ following variables are supported:
 | `MAX_QUEUE_SIZE` | `8` | Maximum queued prompts across chats. |
 | `MENU_PROFILE` | `mixed` | Default /menu layout profile: `mixed`, `daily`, or `dev`. |
 | `TELEMETRY_POST_PROMPT` | `message` | Post-prompt telemetry block mode: `message`, `inline`, `progress`, or `off`. |
+| `TELEGRAM_AUTO_TOPIC_RENAME` | `0` | Automatically rename Telegram forum topics with a compact 1-emoji label after Turn 1 and reset on `/new`. |
+| `TELEGRAM_ENABLE_TOPICS` | `0` | Treat unthreaded supergroup messages as General forum topic (`1`) for topic operations. |
+| `TELEGRAM_AUTO_TOPIC_MODEL` | Empty | Optional model override for topic short-name generation (falls back to `AGY_MODEL` or `STT_AGY_MODEL`). |
+| `TELEGRAM_TOPIC_RESET_PREFIX` | Empty | Optional custom prefix when resetting auto-renamed topics on `/new` (e.g. `T` -> `T1`, `T5`; defaults to `General` / `Topic <id>`). |
 | `STATE_FILE` | `/var/lib/agy-telegram/state.json` | Persistent offset, sessions, settings, and usage. |
 
 | `TEMP_DIR` | `/var/lib/agy-telegram/tmp` | Runtime temporary directory. |

@@ -170,5 +170,10 @@ test("ConversationDatabase upsertConversation correctly inserts and updates sess
   assert.equal(row2.display_title, "Updated Test Prompt");
   assert.equal(row2.step_count, 5);
 
+  // Mark conversation killed so it no longer appears in getConversations / getConversationById
+  assert.equal(convDb.markConversationKilled(testId), true);
+  assert.equal(convDb.getConversationById(testId), null);
+  assert.equal(convDb.getConversations(0, 10).total, 0);
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

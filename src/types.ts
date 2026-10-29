@@ -81,6 +81,7 @@ export interface SessionSettings {
   sttLang?: string;
   ttsMode?: "off" | "voice-only" | "voice-and-text" | "auto";
   ttsVoice?: string;
+  autoTopicRename?: boolean;
 }
 
 export interface Usage {
@@ -115,6 +116,7 @@ export interface SessionState {
   activeMenuScreen?: string;
   updatedAt?: string;
   pendingSubagentPoll?: PendingSubagentPoll | null;
+  hasAutoRenamedTopic?: boolean;
 }
 
 export interface PendingSubagentPoll {
@@ -188,6 +190,10 @@ export interface AppConfig {
     allowBotUpdate: boolean;
     autoInterrupt: boolean;
     telemetryPostPrompt: TelemetryPostPromptMode;
+    autoTopicRename: boolean;
+    autoTopicModel?: string;
+    topicResetPrefix?: string;
+    enableTopics: boolean;
   };
   agy: AgyConfig;
   stt: {

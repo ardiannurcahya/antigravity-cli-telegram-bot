@@ -15,6 +15,7 @@ import { refreshModels } from "../usecases/model-selection.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { defaultSubagentPoller } from "../usecases/subagent-poller.js";
+import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
 import { authorizedMessage } from "./auth.js";
 import { handleCallback } from "./callbacks.js";
 import { handleCommand } from "./commands.js";
@@ -364,6 +365,7 @@ export async function handleUpdate(context: AppContext, update: TelegramUpdate):
       defaultSubagentPoller.cancelPolling(sessionKey);
       context.controllers?.get(controllerKey("subagent_poller", sessionKey))?.abort();
       await cleanupSessionTempFiles(context.config.tempDir, sessionKey);
+      await resetForumTopicNameIfAutoRenamed(context, sessionKey);
       const isTopic = Boolean(message?.message_thread_id) || String(sessionKey).includes(":");
       await context.state.resetSession(sessionKey, true, isTopic);
       await replyWithHtml(context, sessionKey, sessionInfoHtml(context, sessionKey), createMainKeyboard(settingsFor(context, sessionKey)));

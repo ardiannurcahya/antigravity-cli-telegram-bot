@@ -25,6 +25,7 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     sttLang: config.stt?.language ?? "en",
     ttsMode: config.tts?.mode ?? "off",
     ttsVoice: config.tts?.voice ?? "en-US-AndrewMultilingualNeural",
+    autoTopicRename: config.telegram.autoTopicRename ?? false,
   };
   const stored = context.state.session(chatId)?.settings || {};
   const settings: SessionSettings = {
@@ -52,6 +53,7 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     sttLang: typeof stored.sttLang === "string" && stored.sttLang.trim() ? stored.sttLang.trim() : defaults.sttLang,
     ttsMode: stored.ttsMode === "off" || stored.ttsMode === "voice-only" || stored.ttsMode === "voice-and-text" || stored.ttsMode === "auto" ? stored.ttsMode : defaults.ttsMode,
     ttsVoice: typeof stored.ttsVoice === "string" && stored.ttsVoice.trim() ? stored.ttsVoice.trim() : defaults.ttsVoice,
+    autoTopicRename: typeof stored.autoTopicRename === "boolean" ? stored.autoTopicRename : defaults.autoTopicRename,
   };
   if (config.agy.sandbox && !config.agy.allowSandboxDisable) settings.sandbox = true;
   return settings;

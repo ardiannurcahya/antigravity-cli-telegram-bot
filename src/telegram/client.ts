@@ -284,15 +284,8 @@ export class TelegramClient {
         name: name.slice(0, 128),
       }, undefined, 0);
     } catch (error) {
-      try {
-        return await this.call<boolean>("editGeneralForumTopic", {
-          chat_id: chatId,
-          name: name.slice(0, 128),
-        }, undefined, 0);
-      } catch {
-        console.warn("[telegram] Failed to edit forum topic %s: %s", String(messageThreadId), (error as Error).message);
-        return false;
-      }
+      console.warn("[telegram] Failed to edit forum topic %s: %s", String(messageThreadId), (error as Error).message);
+      return false;
     }
   }
   public sendChatAction(chatId: ChatId, action = "typing"): Promise<boolean> {

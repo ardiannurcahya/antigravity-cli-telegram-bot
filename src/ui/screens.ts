@@ -66,6 +66,8 @@ export async function refreshActiveMenu(context: AppContext, chatId: ChatId): Pr
     keyboard = mainInlineKeyboard(context, chatId);
   } else if (session.activeMenuScreen === "clitools") {
     keyboard = cliToolsKeyboard(context, chatId);
+  } else if (session.activeMenuScreen === "modesandbox") {
+    keyboard = modeSandboxKeyboard(context, chatId);
   }
   if (!keyboard) return;
   try {

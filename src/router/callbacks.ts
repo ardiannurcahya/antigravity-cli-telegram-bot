@@ -9,7 +9,9 @@ import {
   backKeyboard,
   button,
   cliOptionsKeyboard,
+  cliToolsKeyboard,
   menuProfileKeyboard,
+  modeSandboxKeyboard,
   sttKeyboard,
   ttsKeyboard,
   verboseKeyboard,
@@ -22,6 +24,7 @@ import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
+import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
 import type { TelegramCallbackQuery } from "../types.js";
 import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
 import { authorizedCallback } from "./auth.js";
@@ -80,6 +83,7 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
     case "new-session": {
       context.queue?.cancelForChat(chatId);
       await cleanupSessionTempFiles(context.config.tempDir, chatId);
+      await resetForumTopicNameIfAutoRenamed(context, chatId);
       const isTopic = Boolean(callback.message?.message_thread_id) || String(chatId).includes(":");
       await context.state.resetSession(chatId, true, isTopic);
       await context.telegram.editMessageText(chatId, messageId, sessionInfoHtml(context, chatId), { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
@@ -146,6 +150,21 @@ async function handleCliAction(context: AppContext, chatId: import("../types.js"
 
 async function toggleSetting(context: AppContext, chatId: import("../types.js").ChatId, messageId: number, option: string): Promise<void> {
   const settings = settingsFor(context, chatId);
+  if (option === "autotopic") {
+    settings.autoTopicRename = !settings.autoTopicRename;
+    await saveSettings(context, chatId, settings);
+    const activeScreen = context.state.session(chatId)?.activeMenuScreen;
+    const keyboard = activeScreen === "modesandbox"
+      ? modeSandboxKeyboard(context, chatId)
+      : cliToolsKeyboard(context, chatId);
+    await context.telegram.editMessageText(
+      chatId,
+      messageId,
+      `🏷️ Auto-topic rename set to ${settings.autoTopicRename ? "On" : "Off"}.`,
+      keyboard
+    );
+    return;
+  }
   if (option === "continue") settings.continueSession = !settings.continueSession;
   if (option === "new-project") settings.newProject = !settings.newProject;
   if (option === "disable-slash") settings.disableSlashCommands = !settings.disableSlashCommands;

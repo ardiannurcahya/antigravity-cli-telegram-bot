@@ -6,6 +6,11 @@ import { runAgyCommand } from "../agy-runner.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { saveSettings, settingsFor, type SettingsOutputFormat } from "../domain/settings.js";
 import {
+  formatDefaultTopicResetName,
+  resolveAutoTopicModel,
+  resolveEffectiveForumThreadId,
+} from "../domain/topic-namer.js";
+import {
   effortKeyboard,
   modeKeyboard,
   modelKeyboard,
@@ -29,6 +34,7 @@ import { scheduleServiceRestart, updateBot, writeRestartNotice } from "../usecas
 import { resolveWorkspacePath } from "../domain/workspace.js";
 import { handleDiffCommand } from "../usecases/diff-command.js";
 import { handleTitleCommand } from "../usecases/title-command.js";
+import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
 import { handleSkillsCommand } from "../usecases/skills-command.js";
 import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { escapeHtml } from "../telegram.js";
@@ -68,6 +74,7 @@ command("/help")(async ({ context, chatId }) => {
 command("/new")(async ({ context, chatId, message }) => {
   context.queue?.cancelForChat(chatId);
   await cleanupSessionTempFiles(context.config.tempDir, chatId);
+  await resetForumTopicNameIfAutoRenamed(context, chatId);
   const isTopic = Boolean(message?.message_thread_id) || String(chatId).includes(":");
   await context.state.resetSession(chatId, true, isTopic);
   await replyWithHtml(context, chatId, sessionInfoHtml(context, chatId), createMainKeyboard(settingsFor(context, chatId)));
@@ -579,6 +586,48 @@ command("/compact")(async ({ context, chatId, args }) => {
     kind: "compact",
     prompt: args.length > 0 ? args.join(" ") : undefined,
   });
+});
+
+command("/autotopic", "/auto_topic", "/autotopicrename")(async ({ context, chatId, args }) => {
+  const settings = settingsFor(context, chatId);
+  const target = args[0]?.toLowerCase().trim();
+  if (target === "on" || target === "1" || target === "true" || target === "enable") {
+    settings.autoTopicRename = true;
+    await saveSettings(context, chatId, settings);
+    await replyWithHtml(context, chatId, "🏷️ <b>Auto Topic Rename enabled</b> for this chat/topic.\n\nAfter turn 1, the topic will be automatically named with a concise 1-emoji label.", createMainKeyboard(settings));
+    return;
+  }
+  if (target === "off" || target === "0" || target === "false" || target === "disable") {
+    settings.autoTopicRename = false;
+    await saveSettings(context, chatId, settings);
+    await replyWithHtml(context, chatId, "🏷️ <b>Auto Topic Rename disabled</b> for this chat/topic.\n\nTopics will not be automatically renamed.", createMainKeyboard(settings));
+    return;
+  }
+  const session = context.state.session(chatId);
+  const currentStatus = settings.autoTopicRename ? "enabled" : "disabled";
+  const defaultStatus = context.config.telegram?.autoTopicRename ? "enabled" : "disabled";
+  const { threadId } = resolveEffectiveForumThreadId(chatId, context.config.telegram?.enableTopics);
+  const namingModel = resolveAutoTopicModel(context.config, settings.model);
+  const resetTarget = threadId !== undefined
+    ? formatDefaultTopicResetName(threadId, context.config.telegram?.topicResetPrefix)
+    : "n/a (1:1 chat)";
+  const renamedInSession = session?.hasAutoRenamedTopic ? "yes (resets on /new)" : "no";
+
+  const statusLines = [
+    `🏷️ <b>Auto Topic Rename is currently ${currentStatus}</b>.\n`,
+    `• <b>Session state:</b> <code>${escapeHtml(currentStatus)}</code> (default: <code>${escapeHtml(defaultStatus)}</code>)`,
+    `• <b>Forum topic:</b> <code>${threadId !== undefined ? `#${threadId}` : "none"}</code>`,
+    `• <b>Renamed in session:</b> <code>${escapeHtml(renamedInSession)}</code>`,
+    `• <b>Reset name on /new:</b> <code>${escapeHtml(resetTarget)}</code>`,
+    `• <b>Naming model:</b> <code>${escapeHtml(namingModel)}</code>\n`,
+    "Use <code>/autotopic on</code>, <code>/autotopic off</code>, or <code>/autotopic status</code>.",
+  ];
+  await replyWithHtml(
+    context,
+    chatId,
+    statusLines.join("\n"),
+    createMainKeyboard(settings)
+  );
 });
 
 command("/diff")(async ({ context, chatId }) => {

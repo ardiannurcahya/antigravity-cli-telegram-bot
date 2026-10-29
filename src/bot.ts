@@ -53,6 +53,7 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "savedefault", description: "Save current settings as permanent defaults" },
   { command: "session", description: "Show session settings" },
   { command: "workspace", description: "Show or change active project workspace" },
+  { command: "autotopic", description: "Toggle dynamic 1-emoji topic renaming (on/off)" },
   { command: "learn", description: "Learn reusable rules/skills from recent chat" },
   { command: "compact", description: "Compact context and create state snapshot to save tokens" },
   { command: "help", description: "Show available commands" },

@@ -33,6 +33,7 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       ...(settings.sttLang ? { STT_LANGUAGE: settings.sttLang } : {}),
       ...(settings.ttsMode ? { TTS_MODE: settings.ttsMode } : {}),
       ...(settings.ttsVoice ? { TTS_VOICE: settings.ttsVoice } : {}),
+      ...(settings.autoTopicRename !== undefined ? { TELEGRAM_AUTO_TOPIC_RENAME: settings.autoTopicRename ? "1" : "0" } : {}),
     };
     const updatedLines = [...lines];
     for (const [key, val] of Object.entries(newVars)) {
@@ -63,10 +64,14 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       if (settings.ttsMode) context.config.tts.mode = settings.ttsMode;
       if (settings.ttsVoice) context.config.tts.voice = settings.ttsVoice;
     }
+    if (settings.autoTopicRename !== undefined) {
+      context.config.telegram.autoTopicRename = settings.autoTopicRename;
+    }
 
     const ttsLine = settings.ttsMode ? `\n• <b>TTS:</b> ${escapeHtml(settings.ttsMode)} (${escapeHtml(settings.ttsVoice || "default")})` : "";
     const sttLine = settings.sttProvider ? `\n• <b>STT:</b> ${escapeHtml(settings.sttProvider)} (${escapeHtml(settings.sttLang || "auto")})` : "";
-    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(modelLabel(settings.model))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}${ttsLine}${sttLine}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
+    const autoTopicLine = settings.autoTopicRename !== undefined ? `\n• <b>Auto Topic Rename:</b> ${settings.autoTopicRename ? "On" : "Off"}` : "";
+    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(modelLabel(settings.model))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}${ttsLine}${sttLine}${autoTopicLine}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
     if (messageId) {
       await context.telegram.editMessageText(chatId, messageId, text, { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
     } else {

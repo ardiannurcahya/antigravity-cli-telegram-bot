@@ -3,6 +3,7 @@ import type { AppContext } from "../context.js";
 import { getModelMaxContext, modelLabel, renderContextProgressBar } from "../models.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor } from "../domain/settings.js";
+import { resolveEffectiveForumThreadId } from "../domain/topic-namer.js";
 import type { ChatId, SessionSettings, Usage } from "../types.js";
 
 export function settingsText(settings: SessionSettings): string {
@@ -12,6 +13,7 @@ export function settingsText(settings: SessionSettings): string {
     `Sandbox: ${settings.sandbox ? "enabled" : "disabled"}`, `Output: ${settings.outputFormat}`,
     settings.workspace ? `Workspace: ${settings.workspace}` : null,
     `Add dirs: ${settings.addDirs?.length || 0}`, `Slash commands: ${settings.disableSlashCommands ? "disabled" : "enabled"}`,
+    `Auto topic rename: ${settings.autoTopicRename ? "enabled" : "disabled"}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -20,6 +22,8 @@ export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
   const maxContext = getModelMaxContext(settings.model);
   const contextStr = maxContext ? `${maxContext.toLocaleString()} tokens` : "Default";
   const modeStr = settings.mode === "accept-edits" ? "edit (accept-edits)" : (settings.mode || "accept-edits");
+  const { threadId } = resolveEffectiveForumThreadId(chatId, context.config.telegram?.enableTopics);
+  const showAutoTopic = threadId !== undefined || Boolean(settings.autoTopicRename);
 
   return [
     "✨ <b>New AGY conversation started.</b>\n",
@@ -29,6 +33,7 @@ export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
     `• <b>Verbose:</b> <code>${escapeHtml(settings.verbose || "detailed")}</code>`,
     `• <b>Context Limit:</b> <code>${escapeHtml(contextStr)}</code>`,
     `• <b>Sandbox:</b> <code>${settings.sandbox ? "Enabled" : "Disabled"}</code>`,
+    showAutoTopic ? `• <b>Auto-Topic:</b> <code>${settings.autoTopicRename ? "Enabled" : "Disabled"}</code>` : null,
     settings.workspace ? `• <b>Workspace:</b> <code>${escapeHtml(settings.workspace)}</code>` : null,
     context.config.agy.project ? `• <b>Project:</b> <code>${escapeHtml(context.config.agy.project)}</code>` : null,
   ].filter(Boolean).join("\n");
