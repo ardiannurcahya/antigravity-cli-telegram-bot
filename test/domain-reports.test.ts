@@ -54,6 +54,65 @@ test("quota: throws when the output carries no quota information", () => {
   assert.throws(() => extractQuota("Antigravity CLI ready\n❯ "), /Models & Quota report/);
 });
 
+test("quota: parses separate GEMINI 4 ARGON section alongside Gemini and Claude & GPT", () => {
+  const sample = `
+└ Models & Quota
+
+  Account: stephan.bolten@gmail.com
+
+GEMINI MODELS
+  Models within this group: Gemini Flash, Gemini Pro
+
+  Weekly Limit Remaining
+    [██████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 43.64%
+    Refreshes in 16h 22m
+
+  Five Hour Limit Remaining
+[█████████████████████████████████████████████████░] 98.42%
+Refreshes in 3h 22m
+
+
+CLAUDE AND GPT MODELS
+  Models within this group: Claude Opus, Claude Sonnet, GPT-OSS
+
+  Weekly Limit Remaining
+[██████████████████████████████████████████████████] 100.00%
+Quota available
+
+  Five Hour Limit Remaining
+[██████████████████████████████████████████████████] 100.00%
+Quota available
+
+
+GEMINI 4 ARGON
+  For paid Pro plans, Argon quota is separate. Higher Argon quota (included as part of the larger Gemini quota bucket) i
+
+  Gemini 4 Argon Weekly Limit
+[███████████████████████████████████████████░░░░░░░] 85.55%
+Refreshes in 167h 0m
+
+
+  │Within each group, models share a weekly limit and a 5-hour limit.
+  ↑/↓ Scroll · pgup/pgdown Page · ctrl+end Bottom · ctrl+home Top · esc Close
+accept-edits · Gemini 3.8 Flash · low (Google AI Pro)
+`;
+
+  const report = extractQuota(sample);
+  assert.equal(report.account, "stephan.bolten@gmail.com");
+  assert.ok(sectionHasLimits(report.gemini));
+  assert.ok(sectionHasLimits(report.claude));
+  assert.ok(sectionHasLimits(report.argon));
+  assert.equal(report.argon.weekly.value, "85.55%");
+  assert.equal(report.argon.weekly.refresh, "167h 0m");
+  assert.equal(report.argon.fiveHour.value, null);
+
+  const html = renderQuota(report);
+  assert.match(html, /<b>Gemini Models<\/b>/);
+  assert.match(html, /<b>Claude & GPT Models<\/b>/);
+  assert.match(html, /<b>Gemini 4 Argon<\/b>/);
+  assert.match(html, /• Weekly: 🔴 <b>85\.55%<\/b> \(in 167h 0m\) <i>\[-14%\]<\/i>/);
+});
+
 // ---------------------------------------------------------------------------
 // Credits
 // ---------------------------------------------------------------------------

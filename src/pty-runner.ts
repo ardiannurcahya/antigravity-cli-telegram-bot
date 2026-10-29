@@ -47,7 +47,7 @@ if pid == 0:
     os.close(master)
     os.setsid()
     try:
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 80, 120, 0, 0))
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
     except Exception:
         pass

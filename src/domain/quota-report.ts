@@ -27,7 +27,8 @@ export interface QuotaReport {
   account: string | null;
   gemini: QuotaSection;
   claude: QuotaSection;
-  /** Fallback section used when neither Gemini nor Claude sections are present. */
+  argon: QuotaSection;
+  /** Fallback section used when neither Gemini, Claude, nor Argon sections are present. */
   general: QuotaSection;
 }
 
@@ -128,7 +129,7 @@ export function extractQuotaLimits(sectionText: string): QuotaSection {
       );
       if (valMatch) section.weekly.value = valMatch[1].trim();
     }
-    const refreshMatch = cleanWeekly.match(/Refreshes\s*in\s*([0-9a-zA-Z\s]+)/i);
+    const refreshMatch = weeklyMatch[0].match(/Refreshes\s*in\s*([0-9a-zA-Z ]+)/i);
     if (refreshMatch) section.weekly.refresh = refreshMatch[1].trim();
   }
 
@@ -146,7 +147,7 @@ export function extractQuotaLimits(sectionText: string): QuotaSection {
       );
       if (valMatch) section.fiveHour.value = valMatch[1].trim();
     }
-    const refreshMatch = cleanFive.match(/Refreshes\s*in\s*([0-9a-zA-Z\s]+)/i);
+    const refreshMatch = fiveHourMatch[0].match(/Refreshes\s*in\s*([0-9a-zA-Z ]+)/i);
     if (refreshMatch) section.fiveHour.refresh = refreshMatch[1].trim();
   }
 
@@ -167,7 +168,7 @@ export function extractQuota(rawOutput: string, cleaned?: string): QuotaReport {
   const panel = quotaStart >= 0 ? text.slice(quotaStart) : text;
 
   const hasQuotaIndicator =
-    /models?\s*&\s*quota|weekly\s*limit|gemini\s*models?|claude\s*(?:and|\/|&)\s*gpt|quota\s*available/i.test(panel);
+    /models?\s*&\s*quota|weekly\s*limit|gemini\s*models?|gemini\s*4\s*argon|claude\s*(?:and|\/|&)\s*gpt|quota\s*available/i.test(panel);
   if (!hasQuotaIndicator) {
     throw new Error(
       `AGY did not produce a Models & Quota report.\n\nCaptured output:\n${panel.slice(0, 500) || "(empty)"}`
@@ -188,23 +189,29 @@ export function extractQuota(rawOutput: string, cleaned?: string): QuotaReport {
   }
 
   const geminiPartMatch = panel.match(
-    /(?:GEMINI\s*MODELS?|Gemini\s+Models?)[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)|$)/i
+    /(?:GEMINI\s*MODELS?|Gemini\s+Models?)[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?|GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5)|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
   );
   const geminiPart = geminiPartMatch ? geminiPartMatch[0] : "";
 
   const claudePartMatch = panel.match(
-    /(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)[\s\S]*$/i
+    /(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)[\s\S]*?(?=(?:GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5)|GEMINI\s*MODELS?|Gemini\s+Models?|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
   );
   const claudePart = claudePartMatch ? claudePartMatch[0] : "";
 
+  const argonPartMatch = panel.match(
+    /(?:GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5))[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?|GEMINI\s*MODELS?|Gemini\s+Models?|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
+  );
+  const argonPart = argonPartMatch ? argonPartMatch[0] : "";
+
   const gemini = extractQuotaLimits(geminiPart);
   const claude = extractQuotaLimits(claudePart);
-  // General is only meaningful (and only rendered) when neither section matched.
-  const general = sectionHasLimits(gemini) || sectionHasLimits(claude)
+  const argon = extractQuotaLimits(argonPart);
+  // General is only meaningful (and only rendered) when no provider section matched.
+  const general = sectionHasLimits(gemini) || sectionHasLimits(claude) || sectionHasLimits(argon)
     ? EMPTY_SECTION()
     : extractQuotaLimits(panel);
 
-  return { account, gemini, claude, general };
+  return { account, gemini, claude, argon, general };
 }
 
 /** Render a {@link QuotaReport} into the Telegram HTML block. */
@@ -214,6 +221,7 @@ export function renderQuota(report: QuotaReport): string {
 
   const hasGeminiLimits = sectionHasLimits(report.gemini);
   const hasClaudeLimits = sectionHasLimits(report.claude);
+  const hasArgonLimits = sectionHasLimits(report.argon);
 
   if (hasGeminiLimits) {
     lines.push("<b>Gemini Models</b>");
@@ -232,7 +240,16 @@ export function renderQuota(report: QuotaReport): string {
     if (fiveHourLine) lines.push(fiveHourLine);
   }
 
-  if (!hasGeminiLimits && !hasClaudeLimits) {
+  if (hasArgonLimits) {
+    if (hasGeminiLimits || hasClaudeLimits) lines.push("");
+    lines.push("<b>Gemini 4 Argon</b>");
+    const weeklyLine = formatQuotaLimitLine("Weekly", report.argon.weekly.value, report.argon.weekly.refresh, WEEKLY_WINDOW_MINUTES);
+    if (weeklyLine) lines.push(weeklyLine);
+    const fiveHourLine = formatQuotaLimitLine("5-Hour", report.argon.fiveHour.value, report.argon.fiveHour.refresh, FIVE_HOUR_WINDOW_MINUTES);
+    if (fiveHourLine) lines.push(fiveHourLine);
+  }
+
+  if (!hasGeminiLimits && !hasClaudeLimits && !hasArgonLimits) {
     if (sectionHasLimits(report.general)) {
       lines.push("<b>Antigravity Quota</b>");
       const weeklyLine = formatQuotaLimitLine("Weekly", report.general.weekly.value, report.general.weekly.refresh, WEEKLY_WINDOW_MINUTES);
