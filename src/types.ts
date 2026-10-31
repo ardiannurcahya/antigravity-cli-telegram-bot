@@ -139,7 +139,7 @@ export interface ConversationSummary {
 
 export interface InFlightJob {
   prompt?: string;
-  kind?: "prompt" | "usage" | "credits" | "context" | "compact" | "subagent_poll";
+  kind?: "prompt" | "usage" | "credits" | "context" | "compact" | "btw" | "subagent_poll";
   imagePath?: string;
   imagePaths?: string[];
   documentPath?: string;

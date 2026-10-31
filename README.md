@@ -278,6 +278,9 @@ system prefix.
 | `/diff` | Show git status and unified diff for the active workspace repository. |
 | `/title [TITLE]` | Rename the active conversation session title (alias: `/rename`). |
 | `/autotopic [on\|off]` | Toggle automatic 1-emoji forum topic renaming after Turn 1 (resets on `/new`). |
+| `/btw QUESTION` | Ask a side question in one-shot mode without altering the active conversation history. |
+| `/fork [TITLE]` | Clone the active conversation into a new parallel branch (alias: `/branch`). |
+| `/rewind [TURNS]` | Roll back the active conversation history by `N` turns (default: `1`, alias: `/undo`). |
 | `/plan PROMPT` | Execute prompt using AGY planning directive (creates architecture/plan first). |
 | `/boost PROMPT` | Execute prompt with AGY boost reasoning directive. |
 | `/goal PROMPT` | Execute prompt with AGY long-running autonomous goal directive. |

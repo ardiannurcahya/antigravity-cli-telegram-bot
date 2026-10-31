@@ -8,7 +8,7 @@ import type { ChatId } from "../types.js";
 export function enqueueJob(context: AppContext, chatId: ChatId, job: Partial<QueueJob>): void {
   const status = context.queue.statusForChat(chatId);
   let effectivePrompt = job.prompt;
-  if (context.config.telegram.autoInterrupt) {
+  if (context.config.telegram.autoInterrupt && job.kind !== "btw") {
     const queuedPrompts = context.queue.pendingForChat(chatId)
       .map((j) => j.prompt)
       .filter(Boolean) as string[];

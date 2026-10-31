@@ -25,6 +25,8 @@ import { updateBot } from "../usecases/self-update.js";
 import { selectModel } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
+import { handleForkCommand } from "../usecases/fork-command.js";
+import { handleRewindCommand } from "../usecases/rewind-command.js";
 import type { TelegramCallbackQuery } from "../types.js";
 import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
 import { authorizedCallback } from "./auth.js";
@@ -67,6 +69,12 @@ export async function handleCallback(context: AppContext, callback: TelegramCall
       return;
     case "compact":
       enqueueJob(context, chatId, { kind: "compact" });
+      return;
+    case "fork":
+      await handleForkCommand(context, chatId, "");
+      return;
+    case "rewind":
+      await handleRewindCommand(context, chatId, "");
       return;
     case "cli":
       await handleCliAction(context, chatId, messageId, action.command);
