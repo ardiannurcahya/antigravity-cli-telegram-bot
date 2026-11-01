@@ -1,4 +1,4 @@
-import type { AppContext } from "../context.js";
+import { isSessionBusy, type AppContext } from "../context.js";
 import { settingsFor } from "../domain/settings.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { escapeHtml } from "../telegram.js";
@@ -16,6 +16,17 @@ export async function handleRewindCommand(
   rawArg: string
 ): Promise<void> {
   const settings = settingsFor(context, chatId);
+
+  if (isSessionBusy(context, chatId)) {
+    await replyWithHtml(
+      context,
+      chatId,
+      "⚠️ <b>Session is currently busy.</b>\n\nPlease wait for the current turn to finish or use <code>/stop</code> first.",
+      createMainKeyboard(settings)
+    );
+    return;
+  }
+
   const trimmed = rawArg.trim();
 
   let turns = 1;
@@ -63,6 +74,16 @@ export async function handleRewindCommand(
         context,
         chatId,
         `⚠️ <b>Cannot rewind ${turns} turn${turns === 1 ? "" : "s"}.</b>\n\n${escapeHtml(available)} Use <code>/new</code> if you want to start a fresh session.`,
+        createMainKeyboard(settings)
+      );
+      return;
+    }
+
+    if (result.reason === "unrecognized_schema") {
+      await replyWithHtml(
+        context,
+        chatId,
+        "⚠️ <b>Cannot rewind this conversation.</b>\n\nThe conversation database uses an unrecognized or incompatible schema. History was left untouched.",
         createMainKeyboard(settings)
       );
       return;
