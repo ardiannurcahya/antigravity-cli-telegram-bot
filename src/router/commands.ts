@@ -37,6 +37,9 @@ import { handleTitleCommand } from "../usecases/title-command.js";
 import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
 import { handleSkillsCommand } from "../usecases/skills-command.js";
 import { handleMcpCommand } from "../usecases/mcp-command.js";
+import { handleBtwCommand } from "../usecases/btw-command.js";
+import { handleForkCommand } from "../usecases/fork-command.js";
+import { handleRewindCommand } from "../usecases/rewind-command.js";
 import { escapeHtml } from "../telegram.js";
 import type { ChatId, TelegramMessage } from "../types.js";
 
@@ -636,6 +639,18 @@ command("/diff")(async ({ context, chatId }) => {
 
 command("/title", "/rename")(async ({ context, chatId, args }) => {
   await handleTitleCommand(context, chatId, args.join(" "));
+});
+
+command("/btw")(async ({ context, chatId, args }) => {
+  await handleBtwCommand(context, chatId, args.join(" "));
+});
+
+command("/fork", "/branch")(async ({ context, chatId, args }) => {
+  await handleForkCommand(context, chatId, args.join(" "));
+});
+
+command("/rewind", "/undo")(async ({ context, chatId, args }) => {
+  await handleRewindCommand(context, chatId, args.join(" "));
 });
 
 command("/agy-confirm")(async ({ context, chatId }) => {

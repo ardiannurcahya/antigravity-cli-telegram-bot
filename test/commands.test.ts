@@ -4,19 +4,19 @@ import assert from "node:assert/strict";
 const REGISTERED_COMMANDS = [
   "menu", "new", "resume", "usage", "credits", "context", "tokens", "quota",
   "status", "cancel", "model", "effort", "mode", "sandbox", "verbose", "savedefault", "session",
-  "learn", "help", "agents", "agent", "project", "add_dir", "output_format", "json_schema",
+  "workspace", "autotopic", "learn", "help", "agents", "agent", "project", "add_dir", "output_format", "json_schema",
   "log_file", "print_timeout", "continue", "new_project", "disable_slash_commands",
-  "changelog", "plugins", "skills", "mcp", "cli_help", "version", "update", "restart", "compact", "diff", "title", "rename", "agy", "agy_confirm"
+  "changelog", "plugins", "skills", "mcp", "cli_help", "version", "update", "restart", "compact", "diff", "title", "rename", "btw", "fork", "branch", "rewind", "undo", "agy", "agy_confirm"
 ];
 
 // List of all commands handled in src/index.ts
 const HANDLED_COMMANDS = new Set([
   "/start", "/menu", "/help", "/new", "/models", "/model", "/effort", "/mode",
-  "/sandbox", "/verbose", "/savedefault", "/setdefault", "/agent", "/project", "/add-dir", "/output-format", "/json-schema",
+  "/sandbox", "/verbose", "/savedefault", "/setdefault", "/workspace", "/autotopic", "/agent", "/project", "/add-dir", "/output-format", "/json-schema",
   "/log-file", "/print-timeout", "/resume", "/sessions", "/continue",
   "/new-project", "/disable-slash-commands", "/agents", "/changelog",
   "/plugins", "/skills", "/mcp", "/cli-help", "/version", "/session", "/learn", "/usage", "/quota",
-  "/credits", "/context", "/tokens", "/status", "/cancel", "/update", "/restart", "/compact", "/diff", "/title", "/rename", "/agy-confirm"
+  "/credits", "/context", "/tokens", "/status", "/cancel", "/update", "/restart", "/compact", "/diff", "/title", "/rename", "/btw", "/fork", "/branch", "/rewind", "/undo", "/agy-confirm"
 ]);
 
 test("all registered telegram commands map to a recognized command handler", () => {

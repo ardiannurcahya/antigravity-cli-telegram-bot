@@ -17,6 +17,7 @@ import { usageText } from "../ui/messages.js";
 import { contextActionsKeyboard } from "../ui/inline-keyboards.js";
 import { refreshActiveMenu } from "../ui/screens.js";
 import { runCompactionJob } from "./compaction.js";
+import { runBtwJob } from "./btw-command.js";
 import { clearSentImagePaths, detectAndSendGeneratedImages } from "./image-detection.js";
 import { parseChatTarget } from "../telegram/client.js";
 import { createTtsService } from "../tts/tts-service.js";
@@ -118,6 +119,12 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
 
   if (job.kind === "compact") {
     await runCompactionJob(context, job, controller, isCancelled);
+    context.controllers.delete(controllerKey("prompt", job.chatId));
+    return;
+  }
+
+  if (job.kind === "btw") {
+    await runBtwJob(context, job, controller, isCancelled);
     context.controllers.delete(controllerKey("prompt", job.chatId));
     return;
   }

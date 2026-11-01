@@ -3,7 +3,7 @@ import type { ChatId } from "./types.js";
 export interface QueueJob {
   chatId: ChatId;
   prompt?: string;
-  kind?: "prompt" | "usage" | "credits" | "context" | "compact";
+  kind?: "prompt" | "usage" | "credits" | "context" | "compact" | "btw";
   id?: string;
   enqueuedAt?: number;
   imagePath?: string;
