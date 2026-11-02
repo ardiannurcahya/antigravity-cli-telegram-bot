@@ -47,6 +47,26 @@ export function isUuid(value: string | undefined | null): boolean {
   return UUID_REGEX.test(value.trim());
 }
 
+export function tableExists(db: any, tableName: string): boolean {
+  try {
+    const row = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1;").get(tableName);
+    return Boolean(row);
+  } catch {
+    return false;
+  }
+}
+
+export function tableHasColumns(db: any, tableName: string, requiredColumns: string[]): boolean {
+  try {
+    const rows = db.prepare(`PRAGMA table_info("${tableName.replace(/"/g, '""')}");`).all() as Array<{ name?: string }>;
+    const existing = new Set(rows.map((r) => r.name?.toLowerCase()));
+    return requiredColumns.every((col) => existing.has(col.toLowerCase()));
+  } catch {
+    return false;
+  }
+}
+
+
 export function parseTimestamp(value: unknown): number {
   if (typeof value === "number") {
     if (value < 10_000_000_000) return value * 1000;
@@ -329,6 +349,20 @@ export class ConversationDatabase {
   ): ForkConversationResult | null {
     if (!DatabaseSyncClass || !sourceId || !isUuid(sourceId)) return null;
     let db: any = null;
+    let createdDstConvDbFile: string | null = null;
+    let createdDstBrainDir: string | null = null;
+
+    const cleanupOrphans = () => {
+      if (createdDstConvDbFile) {
+        try { fs.rmSync(createdDstConvDbFile, { force: true }); } catch {}
+        try { fs.rmSync(`${createdDstConvDbFile}-wal`, { force: true }); } catch {}
+        try { fs.rmSync(`${createdDstConvDbFile}-shm`, { force: true }); } catch {}
+      }
+      if (createdDstBrainDir && fs.existsSync(createdDstBrainDir)) {
+        try { fs.rmSync(createdDstBrainDir, { recursive: true, force: true }); } catch {}
+      }
+    };
+
     try {
       const appDataDir = path.dirname(this.dbPath);
       if (!fs.existsSync(appDataDir)) fs.mkdirSync(appDataDir, { recursive: true });
@@ -350,6 +384,29 @@ export class ConversationDatabase {
         return null;
       }
 
+      // Verify schema validity on source conversation DB if present
+      if (fs.existsSync(srcConvDbFile)) {
+        let srcCheckDb: any = null;
+        try {
+          srcCheckDb = new DatabaseSyncClass(srcConvDbFile);
+          srcCheckDb.exec("PRAGMA wal_checkpoint(PASSIVE);");
+          if (
+            !tableExists(srcCheckDb, "steps") ||
+            !tableHasColumns(srcCheckDb, "steps", ["idx", "step_payload"]) ||
+            !tableExists(srcCheckDb, "trajectory_meta")
+          ) {
+            console.warn(`[convDb] Conversation DB ${sourceId} has unrecognized schema for fork, aborting.`);
+            srcCheckDb.close();
+            return null;
+          }
+          srcCheckDb.close();
+        } catch (err) {
+          srcCheckDb?.close?.();
+          console.warn(`[convDb] Failed to verify source conversation DB ${sourceId}:`, err);
+          return null;
+        }
+      }
+
       const newId = crypto.randomUUID();
       const newTrajectoryId = crypto.randomUUID();
 
@@ -358,16 +415,8 @@ export class ConversationDatabase {
         const dstConvDbFile = path.join(appDataDir, "conversations", `${newId}.db`);
         fs.mkdirSync(path.dirname(dstConvDbFile), { recursive: true });
 
-        // Flush WAL pages to main database file if WAL is active
-        try {
-          const srcDb = new DatabaseSyncClass(srcConvDbFile);
-          srcDb.exec("PRAGMA wal_checkpoint(PASSIVE);");
-          srcDb.close();
-        } catch {
-          // Ignore if busy or read-only
-        }
-
         fs.copyFileSync(srcConvDbFile, dstConvDbFile);
+        createdDstConvDbFile = dstConvDbFile;
 
         let convDb: any = null;
         try {
@@ -382,11 +431,13 @@ export class ConversationDatabase {
             pairs.push([Buffer.from(oldTrajectoryId, "utf8"), Buffer.from(newTrajectoryId, "utf8")]);
           }
 
-          const blobRows = convDb.prepare("SELECT id, data FROM trajectory_metadata_blob;").all() as Array<{ id: string; data: Uint8Array | null }>;
-          for (const row of blobRows) {
-            const updated = replaceUuidInBlob(row.data, pairs);
-            if (updated) {
-              convDb.prepare("UPDATE trajectory_metadata_blob SET data = ? WHERE id = ?;").run(updated, row.id);
+          if (tableExists(convDb, "trajectory_metadata_blob")) {
+            const blobRows = convDb.prepare("SELECT id, data FROM trajectory_metadata_blob;").all() as Array<{ id: string; data: Uint8Array | null }>;
+            for (const row of blobRows) {
+              const updated = replaceUuidInBlob(row.data, pairs);
+              if (updated) {
+                convDb.prepare("UPDATE trajectory_metadata_blob SET data = ? WHERE id = ?;").run(updated, row.id);
+              }
             }
           }
 
@@ -411,6 +462,7 @@ export class ConversationDatabase {
       if (fs.existsSync(srcBrainDir)) {
         const dstBrainDir = path.join(appDataDir, "brain", newId);
         fs.cpSync(srcBrainDir, dstBrainDir, { recursive: true });
+        createdDstBrainDir = dstBrainDir;
         for (const fileName of ["transcript.jsonl", "transcript_full.jsonl"]) {
           const transcriptPath = path.join(dstBrainDir, ".system_generated", "logs", fileName);
           if (fs.existsSync(transcriptPath)) {
@@ -481,7 +533,8 @@ export class ConversationDatabase {
         title: forkTitle,
         stepCount,
       };
-    } catch {
+    } catch (err) {
+      cleanupOrphans();
       return null;
     } finally {
       db?.close();
@@ -517,6 +570,11 @@ export class ConversationDatabase {
         let convDb: any = null;
         try {
           convDb = new DatabaseSyncClass(convDbFile);
+          if (!tableExists(convDb, "steps") || !tableHasColumns(convDb, "steps", ["idx", "step_type", "step_payload"])) {
+            console.warn(`[convDb] Steps table missing or invalid in conversation DB: ${conversationId}`);
+            return { ok: false, reason: "unrecognized_schema" };
+          }
+
           const allSteps = convDb.prepare("SELECT idx, step_type, step_payload FROM steps ORDER BY idx ASC;").all() as Array<{
             idx: number;
             step_type: number;
@@ -524,6 +582,10 @@ export class ConversationDatabase {
           }>;
           const userSteps = allSteps.filter((s) => s.step_type === 14);
           if (userSteps.length === 0) {
+            if (allSteps.length > 0) {
+              console.warn(`[convDb] Conversation DB ${conversationId} has ${allSteps.length} step(s) but no user turns matching step_type = 14. Aborting rewind.`);
+              return { ok: false, reason: "unrecognized_schema" };
+            }
             return { ok: false, reason: "not_found" };
           }
           if (turns >= userSteps.length) {
@@ -564,25 +626,29 @@ export class ConversationDatabase {
 
           if (removedTurnUuids.size > 0) {
             try {
-              const genRows = convDb.prepare("SELECT idx, data FROM gen_metadata;").all() as Array<{ idx: number; data: Uint8Array | null }>;
-              for (const g of genRows) {
-                if (!g.data) continue;
-                const str = Buffer.from(g.data).toString("utf8").toLowerCase();
-                for (const u of removedTurnUuids) {
-                  if (str.includes(u)) {
-                    convDb.prepare("DELETE FROM gen_metadata WHERE idx = ?;").run(g.idx);
-                    break;
+              if (tableExists(convDb, "gen_metadata") && tableHasColumns(convDb, "gen_metadata", ["idx", "data"])) {
+                const genRows = convDb.prepare("SELECT idx, data FROM gen_metadata;").all() as Array<{ idx: number; data: Uint8Array | null }>;
+                for (const g of genRows) {
+                  if (!g.data) continue;
+                  const str = Buffer.from(g.data).toString("utf8").toLowerCase();
+                  for (const u of removedTurnUuids) {
+                    if (str.includes(u)) {
+                      convDb.prepare("DELETE FROM gen_metadata WHERE idx = ?;").run(g.idx);
+                      break;
+                    }
                   }
                 }
               }
-              const execRows = convDb.prepare("SELECT idx, data FROM executor_metadata;").all() as Array<{ idx: number; data: Uint8Array | null }>;
-              for (const e of execRows) {
-                if (!e.data) continue;
-                const str = Buffer.from(e.data).toString("utf8").toLowerCase();
-                for (const u of removedTurnUuids) {
-                  if (str.includes(u)) {
-                    convDb.prepare("DELETE FROM executor_metadata WHERE idx = ?;").run(e.idx);
-                    break;
+              if (tableExists(convDb, "executor_metadata") && tableHasColumns(convDb, "executor_metadata", ["idx", "data"])) {
+                const execRows = convDb.prepare("SELECT idx, data FROM executor_metadata;").all() as Array<{ idx: number; data: Uint8Array | null }>;
+                for (const e of execRows) {
+                  if (!e.data) continue;
+                  const str = Buffer.from(e.data).toString("utf8").toLowerCase();
+                  for (const u of removedTurnUuids) {
+                    if (str.includes(u)) {
+                      convDb.prepare("DELETE FROM executor_metadata WHERE idx = ?;").run(e.idx);
+                      break;
+                    }
                   }
                 }
               }
@@ -648,7 +714,14 @@ export class ConversationDatabase {
         }
       }
 
-      // 3. Update conversation_summaries.db (and handle summary-only fallback)
+      // 3. Update conversation_summaries.db
+      // If cutoffIdx === null, neither the per-conversation SQLite DB nor the
+      // JSONL transcripts contained a recognizable user turn. We deliberately refuse
+      // to perform blind step decrement on conversation_summaries.db.
+      if (cutoffIdx === null) {
+        return { ok: false, reason: "not_found" };
+      }
+
       if (fs.existsSync(this.dbPath)) {
         summaryDb = new DatabaseSyncClass(this.dbPath);
         this.ensureTable(summaryDb);
@@ -659,19 +732,6 @@ export class ConversationDatabase {
           LIMIT 1;
         `).get(conversationId) as { step_count?: number; last_user_input_step_index?: number } | undefined;
 
-        if (cutoffIdx === null) {
-          if (!summaryRow) {
-            return { ok: false, reason: "not_found" };
-          }
-          const currentSteps = Number(summaryRow.step_count || 0);
-          if (currentSteps <= turns) {
-            return { ok: false, reason: "cannot_rewind_initial_turn", totalTurns: currentSteps };
-          }
-          removedSteps = turns;
-          remainingSteps = currentSteps - turns;
-          prevUserIdx = Math.max(0, remainingSteps - 1);
-        }
-
         if (summaryRow) {
           summaryDb.prepare(`
             UPDATE conversation_summaries
@@ -679,8 +739,6 @@ export class ConversationDatabase {
             WHERE conversation_id = ?;
           `).run(remainingSteps, prevUserIdx, new Date().toISOString(), conversationId);
         }
-      } else if (cutoffIdx === null) {
-        return { ok: false, reason: "not_found" };
       }
 
       return {
@@ -708,7 +766,7 @@ export interface ForkConversationResult {
 
 export interface RewindConversationResult {
   ok: boolean;
-  reason?: "invalid_input" | "not_found" | "cannot_rewind_initial_turn" | "db_error";
+  reason?: "invalid_input" | "not_found" | "cannot_rewind_initial_turn" | "db_error" | "unrecognized_schema";
   totalTurns?: number;
   conversationId?: string;
   removedTurns?: number;

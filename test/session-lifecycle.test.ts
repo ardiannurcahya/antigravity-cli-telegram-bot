@@ -8,6 +8,7 @@ import { handleUpdate } from "../src/router/updates.js";
 import { handleBtwCommand, runBtwJob } from "../src/usecases/btw-command.js";
 import { handleForkCommand } from "../src/usecases/fork-command.js";
 import { handleRewindCommand } from "../src/usecases/rewind-command.js";
+import { controllerKey, isSessionBusy } from "../src/context.js";
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite");
@@ -356,6 +357,220 @@ test("session lifecycle: deleteConversation and forkConversation handle SQLite W
     assert.ok(payloadStr.includes(`wal test ${forked.conversationId}`));
     checkDst.close();
     srcDb.close();
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("session lifecycle: /fork and /rewind reject execution when an AGY turn is active (isSessionBusy)", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const chatId = "12345";
+    const convId = "55555555-5555-4555-8555-555555555555";
+    await ctx.state.setSession(chatId, {
+      conversationId: convId,
+      conversationTitle: "Active Session",
+      conversationStepCount: 3,
+    });
+
+    // 1. Prompt turn is active
+    ctx.controllers.set(controllerKey("prompt", chatId), new AbortController());
+    assert.equal(isSessionBusy(ctx, chatId), true);
+
+    await handleForkCommand(ctx, chatId, "");
+    let sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+    assert.ok(sent[sent.length - 1].includes("/stop"));
+
+    await handleRewindCommand(ctx, chatId, "1");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    // 2. Custom command is active
+    ctx.controllers.delete(controllerKey("prompt", chatId));
+    ctx.controllers.set(controllerKey("custom", chatId), new AbortController());
+    assert.equal(isSessionBusy(ctx, chatId), true);
+
+    await handleForkCommand(ctx, chatId, "New Fork");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    await handleRewindCommand(ctx, chatId, "");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    // 3. Queued turn is pending in JobQueue (active is null, queued > 0)
+    ctx.controllers.delete(controllerKey("custom", chatId));
+    assert.equal(isSessionBusy(ctx, chatId), false);
+
+    const originalStatusForChat = ctx.queue.statusForChat.bind(ctx.queue);
+    ctx.queue.statusForChat = (id) =>
+      String(id) === chatId
+        ? { active: null, queued: 1, totalQueued: 1 }
+        : originalStatusForChat(id);
+
+    assert.equal(isSessionBusy(ctx, chatId), true);
+
+    await handleForkCommand(ctx, chatId, "Fork While Queued");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    await handleRewindCommand(ctx, chatId, "1");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    // Restore queue status
+    ctx.queue.statusForChat = originalStatusForChat;
+    assert.equal(isSessionBusy(ctx, chatId), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("session lifecycle: forkConversation validates schema defensively and cleans up orphans on failure", () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const appDataDir = path.dirname(harness.config.agy.dbPath);
+    const convsDir = path.join(appDataDir, "conversations");
+    fs.mkdirSync(convsDir, { recursive: true });
+
+    // 1. Create a corrupted source conversation DB missing trajectory_meta
+    const badSrcId = "66666666-6666-4666-8666-666666666666";
+    const badDbFile = path.join(convsDir, `${badSrcId}.db`);
+    const badDb = new DatabaseSync(badDbFile);
+    badDb.exec("CREATE TABLE steps (idx INT, step_payload BLOB);");
+    badDb.close();
+
+    ctx.convDb.upsertConversation({
+      conversation_id: badSrcId,
+      title: "Corrupted Schema Session",
+      preview: "Corrupted Schema Session",
+      step_count: 2,
+    });
+
+    const result = ctx.convDb.forkConversation(badSrcId, "Fork Attempt");
+    assert.equal(result, null);
+
+    // Ensure no orphan files or new summaries were left behind
+    const page = ctx.convDb.getConversations(0, 10);
+    assert.equal(page.total, 1);
+    assert.equal(page.items[0].conversation_id, badSrcId);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("session lifecycle: rewindConversation returns unrecognized_schema and leaves DB intact when steps table has no user turn", async () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const chatId = "12345";
+    const convId = "77777777-7777-4777-8777-777777777777";
+    const appDataDir = path.dirname(harness.config.agy.dbPath);
+    const convsDir = path.join(appDataDir, "conversations");
+    fs.mkdirSync(convsDir, { recursive: true });
+
+    const convDbPath = path.join(convsDir, `${convId}.db`);
+    const convDb = new DatabaseSync(convDbPath);
+    convDb.exec(`
+      CREATE TABLE steps (idx integer PRIMARY KEY, step_type integer, step_payload blob);
+    `);
+    // Insert steps with planner (15) and tool (132), but NO user step (14)
+    convDb.prepare("INSERT INTO steps VALUES (0, 15, x'616263');").run();
+    convDb.prepare("INSERT INTO steps VALUES (1, 132, x'646566');").run();
+    convDb.close();
+
+    ctx.convDb.upsertConversation({
+      conversation_id: convId,
+      title: "No User Turns Session",
+      preview: "No User Turns Session",
+      step_count: 2,
+    });
+    await ctx.state.setSession(chatId, {
+      conversationId: convId,
+      conversationTitle: "No User Turns Session",
+      conversationStepCount: 2,
+    });
+
+    const result = ctx.convDb.rewindConversation(convId, 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "unrecognized_schema");
+
+    // Command output test
+    await handleRewindCommand(ctx, chatId, "1");
+    const sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("unrecognized or incompatible schema"));
+    assert.ok(sent[sent.length - 1].includes("History was left untouched"));
+
+    // Verify steps were not deleted from SQLite
+    const checkDb = new DatabaseSync(convDbPath, { readOnly: true });
+    const remaining = checkDb.prepare("SELECT idx FROM steps;").all();
+    assert.equal(remaining.length, 2);
+    checkDb.close();
+
+    // Verify conversation_summaries.db was not modified
+    const summary = ctx.convDb.getConversationById(convId);
+    assert.equal(summary?.step_count, 2);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("session lifecycle: rewindConversation safely aborts with unrecognized_schema when steps table is missing", () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const convId = "88888888-8888-4888-8888-888888888888";
+    const appDataDir = path.dirname(harness.config.agy.dbPath);
+    const convsDir = path.join(appDataDir, "conversations");
+    fs.mkdirSync(convsDir, { recursive: true });
+
+    const convDbPath = path.join(convsDir, `${convId}.db`);
+    const convDb = new DatabaseSync(convDbPath);
+    convDb.exec("CREATE TABLE invalid_table (id text);");
+    convDb.close();
+
+    ctx.convDb.upsertConversation({
+      conversation_id: convId,
+      title: "Missing Steps Table",
+      preview: "Missing Steps Table",
+      step_count: 3,
+    });
+
+    const result = ctx.convDb.rewindConversation(convId, 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "unrecognized_schema");
+
+    // Summary must remain untouched
+    const summary = ctx.convDb.getConversationById(convId);
+    assert.equal(summary?.step_count, 3);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("session lifecycle: rewindConversation refuses blind decrement when no convDb or transcripts exist", () => {
+  const harness = createHarness();
+  const ctx = asAppContext(harness);
+  try {
+    const convId = "99999999-9999-4999-8999-999999999999";
+    // Conversation only exists in summary database, no files on disk
+    ctx.convDb.upsertConversation({
+      conversation_id: convId,
+      title: "Summary Only Session",
+      preview: "Summary Only Session",
+      step_count: 5,
+    });
+
+    const result = ctx.convDb.rewindConversation(convId, 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "not_found");
+
+    // Summary step_count must NOT be decremented blindly
+    const summary = ctx.convDb.getConversationById(convId);
+    assert.equal(summary?.step_count, 5);
   } finally {
     harness.cleanup();
   }

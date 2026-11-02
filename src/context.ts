@@ -28,3 +28,15 @@ export interface BaseServices {
 export function controllerKey(scope: "prompt" | "custom" | "subagent_poller", chatId: ChatId): string {
   return `${scope}:${chatId}`;
 }
+
+/**
+ * Checks whether an active AGY turn (prompt, custom command, or queued job) is currently
+ * processing for the specified chat.
+ */
+export function isSessionBusy(context: AppContext, chatId: ChatId): boolean {
+  if (context.controllers?.has(controllerKey("prompt", chatId))) return true;
+  if (context.controllers?.has(controllerKey("custom", chatId))) return true;
+  const status = context.queue?.statusForChat?.(chatId);
+  return Boolean(status?.active || (status?.queued ?? 0) > 0);
+}
+

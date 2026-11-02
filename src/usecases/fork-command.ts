@@ -1,4 +1,4 @@
-import type { AppContext } from "../context.js";
+import { isSessionBusy, type AppContext } from "../context.js";
 import { settingsFor } from "../domain/settings.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { escapeHtml } from "../telegram.js";
@@ -16,6 +16,17 @@ export async function handleForkCommand(
   rawCustomTitle: string
 ): Promise<void> {
   const settings = settingsFor(context, chatId);
+
+  if (isSessionBusy(context, chatId)) {
+    await replyWithHtml(
+      context,
+      chatId,
+      "⚠️ <b>Session is currently busy.</b>\n\nPlease wait for the current turn to finish or use <code>/stop</code> first.",
+      createMainKeyboard(settings)
+    );
+    return;
+  }
+
   const session = context.state.session(chatId);
   const sourceId = session?.conversationId;
 
