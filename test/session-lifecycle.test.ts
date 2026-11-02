@@ -400,7 +400,28 @@ test("session lifecycle: /fork and /rewind reject execution when an AGY turn is 
     sent = harness.telegram.sentTexts();
     assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
 
+    // 3. Queued turn is pending in JobQueue (active is null, queued > 0)
     ctx.controllers.delete(controllerKey("custom", chatId));
+    assert.equal(isSessionBusy(ctx, chatId), false);
+
+    const originalStatusForChat = ctx.queue.statusForChat.bind(ctx.queue);
+    ctx.queue.statusForChat = (id) =>
+      String(id) === chatId
+        ? { active: null, queued: 1, totalQueued: 1 }
+        : originalStatusForChat(id);
+
+    assert.equal(isSessionBusy(ctx, chatId), true);
+
+    await handleForkCommand(ctx, chatId, "Fork While Queued");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    await handleRewindCommand(ctx, chatId, "1");
+    sent = harness.telegram.sentTexts();
+    assert.ok(sent[sent.length - 1].includes("Session is currently busy"));
+
+    // Restore queue status
+    ctx.queue.statusForChat = originalStatusForChat;
     assert.equal(isSessionBusy(ctx, chatId), false);
   } finally {
     harness.cleanup();

@@ -37,6 +37,6 @@ export function isSessionBusy(context: AppContext, chatId: ChatId): boolean {
   if (context.controllers?.has(controllerKey("prompt", chatId))) return true;
   if (context.controllers?.has(controllerKey("custom", chatId))) return true;
   const status = context.queue?.statusForChat?.(chatId);
-  return Boolean(status?.active);
+  return Boolean(status?.active || (status?.queued ?? 0) > 0);
 }
 
