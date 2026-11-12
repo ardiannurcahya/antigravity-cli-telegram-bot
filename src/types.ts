@@ -169,6 +169,7 @@ export interface AgyConfig {
   model: string;
   effort: "low" | "medium" | "high";
   allowedModels: string[];
+  allowedModelsExplicit?: boolean;
   timeoutMs: number;
   maxOutputBytes: number;
   agent?: string;
