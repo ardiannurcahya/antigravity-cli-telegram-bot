@@ -1,6 +1,13 @@
 import type { ModelOption } from "./types.js";
 
 export const DEFAULT_MODELS: ModelOption[] = [
+  { id: "gemini-4-hydrogen-xhigh", label: "Gemini 4 Hydrogen (XHigh)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-hydrogen-high", label: "Gemini 4 Hydrogen (High)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-hydrogen-medium", label: "Gemini 4 Hydrogen (Medium)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-hydrogen-low", label: "Gemini 4 Hydrogen (Low)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-argon-medium", label: "Gemini 4 Argon (Medium)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-argon-low", label: "Gemini 4 Argon (Low)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)", maxContextWindow: 1_000_000 },
@@ -12,6 +19,12 @@ export const DEFAULT_MODELS: ModelOption[] = [
   { id: "gemini-3.6-flash-low", label: "Gemini 3.6 Flash (Low)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.1-pro-high", label: "Gemini 3.1 Pro (High)", maxContextWindow: 2_000_000 },
   { id: "gemini-3.1-pro-low", label: "Gemini 3.1 Pro (Low)", maxContextWindow: 2_000_000 },
+  { id: "claude-opus-5-5-high", label: "Claude Opus 5.5 (High)", maxContextWindow: 200_000 },
+  { id: "claude-opus-5-5-medium", label: "Claude Opus 5.5 (Medium)", maxContextWindow: 200_000 },
+  { id: "claude-opus-5-5-low", label: "Claude Opus 5.5 (Low)", maxContextWindow: 200_000 },
+  { id: "claude-sonnet-5-5-high", label: "Claude Sonnet 5.5 (High)", maxContextWindow: 200_000 },
+  { id: "claude-sonnet-5-5-medium", label: "Claude Sonnet 5.5 (Medium)", maxContextWindow: 200_000 },
+  { id: "claude-sonnet-5-5-low", label: "Claude Sonnet 5.5 (Low)", maxContextWindow: 200_000 },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Thinking)", maxContextWindow: 200_000 },
   { id: "claude-opus-4-6-thinking", label: "Claude Opus 4.6 (Thinking)", maxContextWindow: 200_000 },
   { id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)", maxContextWindow: 128_000 },

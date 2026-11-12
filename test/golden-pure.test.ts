@@ -43,6 +43,10 @@ test("golden: buildArgs skips effort for claude models and effort-suffixed model
   assert.ok(!claude.includes("--effort"));
   const suffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-3.7-flash-medium", effort: "low" });
   assert.ok(!suffixed.includes("--effort"));
+  const xhighSuffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-4-hydrogen-xhigh", effort: "high" });
+  assert.ok(!xhighSuffixed.includes("--effort"));
+  const maxSuffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-4-hydrogen-max", effort: "high" });
+  assert.ok(!maxSuffixed.includes("--effort"));
 });
 
 test("golden: parseCommandArgs handles quotes, escapes, and rejects unclosed quotes", () => {

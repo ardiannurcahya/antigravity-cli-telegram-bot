@@ -91,10 +91,15 @@ export function isTtsMode(value: string): value is "off" | "voice-only" | "voice
 
 function modelsFrom(env: Record<string, string | undefined>): string[] {
   const configured = (env.AGY_ALLOWED_MODELS || "").split(",").map((value) => value.trim()).filter(Boolean);
-  const ids = configured.length ? configured : DEFAULT_MODELS.map((model) => model.id);
-  const known = new Set(DEFAULT_MODELS.map((model) => model.id));
-  for (const id of ids) if (!known.has(id)) throw new Error(`AGY_ALLOWED_MODELS contains unsupported model: ${id}`);
-  return ids;
+  if (configured.length) {
+    return configured;
+  }
+  const defaults = DEFAULT_MODELS.map((model) => model.id);
+  const model = (env.AGY_MODEL || "").trim();
+  if (model && !defaults.includes(model)) {
+    return [model, ...defaults];
+  }
+  return defaults;
 }
 
 function numericCsvFrom(env: Record<string, string | undefined>, name: string): string[] {
