@@ -5,7 +5,11 @@ import { DEFAULT_MODELS, getActiveModels, getModelMaxContext, parseAgyModelsOutp
 
 const base = { TELEGRAM_BOT_TOKEN: "token", TELEGRAM_ALLOWED_USER_IDS: "123,456", AGY_WORKSPACE: "/srv/workspace" };
 test("loads full-control defaults and allowlist", () => { const config = loadConfig(base); assert.deepEqual(config.telegram.allowedUserIds, ["123", "456"]); assert.equal(config.telegram.privateOnly, true); assert.equal(config.agy.mode, "plan"); assert.equal(config.agy.sandbox, false); assert.equal(config.agy.allowSandboxDisable, true); assert.equal(config.agy.allowDangerouslySkipPermissions, false); assert.equal(config.agy.effort, "high"); assert.ok(config.agy.allowedModels.includes("gemini-3.7-flash-high")); assert.ok(config.agy.allowedModels.includes("claude-sonnet-4-6")); });
-test("rejects invalid configuration", () => { assert.throws(() => loadConfig({ ...base, TELEGRAM_ALLOWED_USER_IDS: "" }), /at least one ID/); assert.throws(() => loadConfig({ ...base, AGY_WORKSPACE: "workspace" }), /absolute/); assert.throws(() => loadConfig({ ...base, AGY_MODE: "dangerously-skip-permissions" }), /AGY_MODE/); assert.throws(() => loadConfig({ ...base, AGY_EFFORT: "extreme" }), /AGY_EFFORT/); assert.throws(() => loadConfig({ ...base, AGY_ALLOWED_MODELS: "not-a-model" }), /AGY_ALLOWED_MODELS/); });
+test("rejects invalid configuration", () => { assert.throws(() => loadConfig({ ...base, TELEGRAM_ALLOWED_USER_IDS: "" }), /at least one ID/); assert.throws(() => loadConfig({ ...base, AGY_WORKSPACE: "workspace" }), /absolute/); assert.throws(() => loadConfig({ ...base, AGY_MODE: "dangerously-skip-permissions" }), /AGY_MODE/); assert.throws(() => loadConfig({ ...base, AGY_EFFORT: "extreme" }), /AGY_EFFORT/); assert.throws(() => loadConfig({ ...base, AGY_ALLOWED_MODELS: "custom-model", AGY_MODEL: "other-model" }), /AGY_MODEL is not in AGY_ALLOWED_MODELS/); });
+test("accepts custom AGY_MODEL and AGY_ALLOWED_MODELS without requiring DEFAULT_MODELS update", () => {
+  assert.deepEqual(loadConfig({ ...base, AGY_ALLOWED_MODELS: "future-model-1,future-model-2", AGY_MODEL: "future-model-1" }).agy.allowedModels, ["future-model-1", "future-model-2"]);
+  assert.ok(loadConfig({ ...base, AGY_MODEL: "future-model-1" }).agy.allowedModels.includes("future-model-1"));
+});
 test("allows sandbox disable", () => { assert.equal(loadConfig({ ...base, AGY_ALLOW_SANDBOX_DISABLE: "0" }).agy.allowSandboxDisable, false); });
 test("allows the dangerous permission flag to be enabled via env", () => { assert.equal(loadConfig({ ...base, AGY_ALLOW_DANGEROUSLY_SKIP_PERMISSIONS: "1" }).agy.allowDangerouslySkipPermissions, true); });
 test("allows the dangerous permission flag to be disabled", () => { assert.equal(loadConfig({ ...base, AGY_ALLOW_DANGEROUSLY_SKIP_PERMISSIONS: "0" }).agy.allowDangerouslySkipPermissions, false); });
@@ -84,8 +88,9 @@ test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without o
   assert.ok(ids.includes("gemini-3.1-pro-low"));
   assert.ok(ids.includes("claude-sonnet-4-6"));
   assert.ok(ids.includes("claude-opus-4-6-thinking"));
+  assert.ok(ids.includes("gemini-4-hydrogen-medium"));
   assert.ok(ids.includes("gpt-oss-120b-medium"));
-  assert.equal(ids.length, 14);
+  assert.equal(ids.length, 27);
 });
 
 test("loads default STT provider as none and TTS mode as off", () => {
