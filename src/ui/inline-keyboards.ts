@@ -1,7 +1,6 @@
 import type { AppContext } from "../context.js";
-import { getActiveModels } from "../models.js";
 import { formatRelativeTime } from "../db.js";
-import { settingsFor } from "../domain/settings.js";
+import { getAvailableModels, settingsFor } from "../domain/settings.js";
 import { listAvailableWorkspaces } from "../domain/workspace.js";
 import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary, SessionState } from "../types.js";
 
@@ -52,7 +51,7 @@ export function resumeKeyboard(page = 0, totalPages = 1, items: ConversationSumm
 
 export function modelKeyboard(context: AppContext, chatId: ChatId, page = 0): InlineKeyboardMarkup {
   const pageSize = 5;
-  const models = getActiveModels();
+  const models = getAvailableModels(context, chatId);
   const totalPages = Math.max(1, Math.ceil(models.length / pageSize));
   const normalizedPage = Math.min(Math.max(page, 0), totalPages - 1);
   const selected = settingsFor(context, chatId).model;
