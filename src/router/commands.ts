@@ -4,7 +4,7 @@ import { isEffort, isMode, isVerbose } from "../config.js";
 import { getActiveModels } from "../models.js";
 import { runAgyCommand } from "../agy-runner.js";
 import { createMainKeyboard } from "../keyboards.js";
-import { saveSettings, settingsFor, type SettingsOutputFormat } from "../domain/settings.js";
+import { getAvailableModels, saveSettings, settingsFor, type SettingsOutputFormat } from "../domain/settings.js";
 import {
   formatDefaultTopicResetName,
   resolveAutoTopicModel,
@@ -112,7 +112,7 @@ command("/models", "/model")(async ({ context, chatId, args }) => {
   const targetModel = args[0].trim();
   const outcome = await selectModel(context, chatId, targetModel);
   if (!outcome) {
-    await reply(context, chatId, `Unknown model: ${targetModel}\nAllowed: ${getActiveModels().map((m) => m.id).join(", ")}`, modelKeyboard(context, chatId, 0));
+    await reply(context, chatId, `Unknown model: ${targetModel}\nAllowed: ${getAvailableModels(context, chatId).map((m) => m.id).join(", ")}`, modelKeyboard(context, chatId, 0));
     return;
   }
   await replyWithHtml(context, chatId, outcome.text, outcome.defaultOfferKeyboard);

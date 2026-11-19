@@ -1,12 +1,39 @@
 import { isEffort, isMode, isVerbose, isMenuProfile } from "../config.js";
-import { getActiveModels } from "../models.js";
+import { getActiveModels, getModelMaxContext, modelLabel } from "../models.js";
 import type { AppContext } from "../context.js";
-import type { ChatId, SessionSettings } from "../types.js";
+import type { ChatId, ModelOption, SessionSettings } from "../types.js";
 
 export type SettingsOutputFormat = NonNullable<SessionSettings["outputFormat"]>;
 
 export function isModelAllowed(context: Pick<AppContext, "config">, modelId: string): boolean {
-  return getActiveModels().some((model) => model.id === modelId) || context.config.agy.allowedModels.includes(modelId);
+  const { allowedModels, allowedModelsExplicit } = context.config.agy;
+  if (allowedModelsExplicit !== false && allowedModels.length > 0) {
+    return allowedModels.includes(modelId);
+  }
+  return getActiveModels().some((model) => model.id === modelId) || allowedModels.includes(modelId);
+}
+
+export function getAvailableModels(context: Pick<AppContext, "config" | "state">, chatId?: ChatId): ModelOption[] {
+  const byId = new Map<string, ModelOption>();
+  const register = (id: string) => {
+    const trimmed = id.trim();
+    if (!trimmed || byId.has(trimmed)) return;
+    byId.set(trimmed, {
+      id: trimmed,
+      label: modelLabel(trimmed),
+      maxContextWindow: getModelMaxContext(trimmed),
+    });
+  };
+  if (context.config.agy.model) register(context.config.agy.model);
+  if (chatId !== undefined) {
+    const storedModel = context.state.session(chatId)?.settings?.model;
+    if (typeof storedModel === "string") register(storedModel);
+  }
+  for (const id of context.config.agy.allowedModels) register(id);
+  for (const model of getActiveModels()) {
+    if (!byId.has(model.id)) byId.set(model.id, model);
+  }
+  return [...byId.values()].filter((model) => isModelAllowed(context, model.id));
 }
 
 export function settingsFor(context: AppContext, chatId: ChatId): SessionSettings {

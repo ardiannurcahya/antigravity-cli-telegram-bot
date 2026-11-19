@@ -23,6 +23,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (!isMode(mode)) throw new Error("AGY_MODE must be plan or accept-edits");
   const effort = (env.AGY_EFFORT || "high").trim();
   if (!isEffort(effort)) throw new Error("AGY_EFFORT must be low, medium, or high");
+  const allowedModelsExplicit = Boolean((env.AGY_ALLOWED_MODELS || "").split(",").map((value) => value.trim()).filter(Boolean).length);
   const allowedModels = modelsFrom(env);
   const model = (env.AGY_MODEL || "").trim();
   if (model && !allowedModels.includes(model)) throw new Error(`AGY_MODEL is not in AGY_ALLOWED_MODELS: ${model}`);
@@ -48,7 +49,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     agy: {
       bin: (env.AGY_BIN || "/root/.local/bin/agy").trim(), workspace, project: (env.AGY_PROJECT || "").trim(), mode,
       sandbox: booleanFrom(env, "AGY_SANDBOX", false), allowSandboxDisable: booleanFrom(env, "AGY_ALLOW_SANDBOX_DISABLE", true),
-      model, effort, allowedModels, timeoutMs: positiveIntegerFrom(env, "AGY_TIMEOUT_MS", 1_800_000),
+      model, effort, allowedModels, allowedModelsExplicit, timeoutMs: positiveIntegerFrom(env, "AGY_TIMEOUT_MS", 1_800_000),
       maxOutputBytes: positiveIntegerFrom(env, "AGY_MAX_OUTPUT_BYTES", 20_000_000),
       agent: (env.AGY_AGENT || "").trim() || undefined,
       allowDangerouslySkipPermissions: booleanFrom(env, "AGY_ALLOW_DANGEROUSLY_SKIP_PERMISSIONS", false),
