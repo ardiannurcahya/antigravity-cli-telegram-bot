@@ -88,9 +88,11 @@ test("DEFAULT_MODELS contains supported Gemini, Claude, and GPT models without o
   assert.ok(ids.includes("gemini-3.1-pro-low"));
   assert.ok(ids.includes("claude-sonnet-4-6"));
   assert.ok(ids.includes("claude-opus-4-6-thinking"));
+  assert.ok(ids.includes("gemini-4-neon-medium"));
+  assert.ok(ids.includes("gemini-pro-orchestrator-neon"));
   assert.ok(ids.includes("gemini-4-hydrogen-medium"));
   assert.ok(ids.includes("gpt-oss-120b-medium"));
-  assert.equal(ids.length, 27);
+  assert.equal(ids.length, 33);
 });
 
 test("loads default STT provider as none and TTS mode as off", () => {

@@ -1,6 +1,10 @@
 import type { ModelOption } from "./types.js";
 
 export const DEFAULT_MODELS: ModelOption[] = [
+  { id: "gemini-4-neon-xhigh", label: "Gemini 4 Neon (XHigh)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-neon-high", label: "Gemini 4 Neon (High)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-neon-medium", label: "Gemini 4 Neon (Medium)", maxContextWindow: 1_000_000 },
+  { id: "gemini-4-neon-low", label: "Gemini 4 Neon (Low)", maxContextWindow: 1_000_000 },
   { id: "gemini-4-hydrogen-xhigh", label: "Gemini 4 Hydrogen (XHigh)", maxContextWindow: 1_000_000 },
   { id: "gemini-4-hydrogen-high", label: "Gemini 4 Hydrogen (High)", maxContextWindow: 1_000_000 },
   { id: "gemini-4-hydrogen-medium", label: "Gemini 4 Hydrogen (Medium)", maxContextWindow: 1_000_000 },
@@ -8,6 +12,8 @@ export const DEFAULT_MODELS: ModelOption[] = [
   { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)", maxContextWindow: 1_000_000 },
   { id: "gemini-4-argon-medium", label: "Gemini 4 Argon (Medium)", maxContextWindow: 1_000_000 },
   { id: "gemini-4-argon-low", label: "Gemini 4 Argon (Low)", maxContextWindow: 1_000_000 },
+  { id: "gemini-pro-orchestrator-neon", label: "Orchestrator (Neon)", maxContextWindow: 1_000_000 },
+  { id: "gemini-pro-orchestrator-g1-pro", label: "Orchestrator (Argon)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)", maxContextWindow: 1_000_000 },
   { id: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)", maxContextWindow: 1_000_000 },
