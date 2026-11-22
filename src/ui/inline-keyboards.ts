@@ -1,6 +1,13 @@
 import type { AppContext } from "../context.js";
 import { formatRelativeTime } from "../db.js";
 import { getAvailableModels, settingsFor } from "../domain/settings.js";
+import {
+  findFamilyAndEffort,
+  formatOrchestratorPairing,
+  getOrchestratorFamilies,
+  isOrchestratorModel,
+  primaryOrchestratorModelId,
+} from "../domain/orchestrator.js";
 import { listAvailableWorkspaces } from "../domain/workspace.js";
 import type { ChatId, InlineKeyboardMarkup, InlineButton, ConversationSummary, SessionState } from "../types.js";
 
@@ -49,19 +56,102 @@ export function resumeKeyboard(page = 0, totalPages = 1, items: ConversationSumm
   return { inline_keyboard: rows };
 }
 
+function chunkButtons(items: InlineButton[], size: number): InlineButton[][] {
+  const rows: InlineButton[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    rows.push(items.slice(i, i + size));
+  }
+  return rows;
+}
+
 export function modelKeyboard(context: AppContext, chatId: ChatId, page = 0): InlineKeyboardMarkup {
   const pageSize = 5;
-  const models = getAvailableModels(context, chatId);
+  const allAvailable = getAvailableModels(context, chatId);
+  const settings = settingsFor(context, chatId);
+  const selected = settings.model;
+  const primaryOrchId = primaryOrchestratorModelId(allAvailable, selected);
+  const models = allAvailable.filter((model) => !isOrchestratorModel(model.id));
   const totalPages = Math.max(1, Math.ceil(models.length / pageSize));
   const normalizedPage = Math.min(Math.max(page, 0), totalPages - 1);
-  const selected = settingsFor(context, chatId).model;
-  const rows = models.slice(normalizedPage * pageSize, normalizedPage * pageSize + pageSize).map((model) => [button(`${model.id === selected ? "✅ " : ""}${model.label}`, `set:model:${model.id}`)]);
+  const rows: InlineButton[][] = [];
+  if (primaryOrchId) {
+    const isOrchActive = isOrchestratorModel(selected);
+    const pairing = formatOrchestratorPairing(settings.orchestratorPlanner, settings.orchestratorExecutor);
+    const orchLabel = pairing ? `Orchestrator (${pairing})` : "Orchestrator";
+    rows.push([button(`${isOrchActive ? "✅ " : ""}🎭 ${orchLabel} ⚙️`, "menu:orchestrator")]);
+  }
+  for (const model of models.slice(normalizedPage * pageSize, normalizedPage * pageSize + pageSize)) {
+    rows.push([button(`${model.id === selected ? "✅ " : ""}${model.label}`, `set:model:${model.id}`)]);
+  }
   const navigation = [];
   if (normalizedPage > 0) navigation.push(button("‹", `menu:models:${normalizedPage - 1}`));
   navigation.push(button(`${normalizedPage + 1}/${totalPages}`, "noop"));
   if (normalizedPage < totalPages - 1) navigation.push(button("›", `menu:models:${normalizedPage + 1}`));
   rows.push(navigation);
   rows.push([button("‹ Back", "menu:main")]);
+  return { inline_keyboard: rows };
+}
+
+export function orchestratorKeyboard(context: AppContext, chatId: ChatId): InlineKeyboardMarkup {
+  const available = getAvailableModels(context, chatId);
+  const settings = settingsFor(context, chatId);
+  const plannerFamilies = getOrchestratorFamilies(available, "planner");
+  const executorFamilies = getOrchestratorFamilies(available, "executor");
+
+  const activePlanner = findFamilyAndEffort(plannerFamilies, settings.orchestratorPlanner);
+  const activeExecutor = findFamilyAndEffort(executorFamilies, settings.orchestratorExecutor);
+  const displayedPlannerFamily = activePlanner?.family || plannerFamilies[0];
+  const displayedExecutorFamily = activeExecutor?.family || executorFamilies[0];
+
+  const rows: InlineButton[][] = [];
+
+  if (plannerFamilies.length > 0) {
+    const plannerBtns = plannerFamilies.map((family) =>
+      button(
+        `🧠 ${activePlanner?.family.familyId === family.familyId ? "✅ " : ""}${family.shortName}`,
+        `set:orch:pf:${family.familyId}`
+      )
+    );
+    rows.push(...chunkButtons(plannerBtns, plannerFamilies.length === 4 ? 2 : 3));
+  }
+
+  if (displayedPlannerFamily) {
+    rows.push(
+      displayedPlannerFamily.variants.map((variant) =>
+        button(
+          `${activePlanner?.variant.id === variant.id ? "✅ " : ""}${variant.effort}`,
+          `set:orch:pe:${variant.effort}`
+        )
+      )
+    );
+  }
+
+  if (executorFamilies.length > 0) {
+    const executorBtns = executorFamilies.map((family) =>
+      button(
+        `⚡ ${activeExecutor?.family.familyId === family.familyId ? "✅ " : ""}${family.shortName}`,
+        `set:orch:ef:${family.familyId}`
+      )
+    );
+    rows.push(...chunkButtons(executorBtns, executorFamilies.length === 4 ? 2 : 3));
+  }
+
+  if (displayedExecutorFamily) {
+    rows.push(
+      displayedExecutorFamily.variants.map((variant) =>
+        button(
+          `${activeExecutor?.variant.id === variant.id ? "✅ " : ""}${variant.effort}`,
+          `set:orch:ee:${variant.effort}`
+        )
+      )
+    );
+  }
+
+  rows.push([
+    button("⭐ Set as Default", "action:setdefault"),
+    button("🔄 Reset Pairing", "set:orch:reset:default"),
+  ]);
+  rows.push([button("‹ Back to Models", "menu:models"), button("‹ Main Menu", "menu:main")]);
   return { inline_keyboard: rows };
 }
 

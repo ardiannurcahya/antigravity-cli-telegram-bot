@@ -31,7 +31,7 @@ export class StateStore {
     // In forum topics, preserveWorkspace defaults to true (preserve workspace bound to topic).
     const keepWorkspace = preserveWorkspace !== undefined ? preserveWorkspace : isTopic;
     if (preserveSettings && existing?.settings) {
-      const { continueSession, newProject, model, effort, ...restSettings } = existing.settings;
+      const { continueSession, newProject, model, effort, orchestratorPlanner, orchestratorExecutor, ...restSettings } = existing.settings;
       if (!keepWorkspace) {
         restSettings.workspace = null;
       }

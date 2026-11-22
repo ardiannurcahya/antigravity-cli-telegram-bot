@@ -1,6 +1,7 @@
 import { formatRelativeTime, type ConversationPage } from "../db.js";
 import type { AppContext } from "../context.js";
 import { getModelMaxContext, modelLabel, renderContextProgressBar } from "../models.js";
+import { formatModelDisplay } from "../domain/orchestrator.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor } from "../domain/settings.js";
 import { resolveEffectiveForumThreadId } from "../domain/topic-namer.js";
@@ -8,13 +9,26 @@ import type { ChatId, SessionSettings, Usage } from "../types.js";
 
 export function settingsText(settings: SessionSettings): string {
   return [
-    `Model: ${modelLabel(settings.model)}`, `Effort: ${settings.effort}`, `Mode: ${settings.mode}`,
+    `Model: ${formatModelDisplay(settings)}`, `Effort: ${settings.effort}`, `Mode: ${settings.mode}`,
     `Verbose: ${settings.verbose || "detailed"}`, `Agent: ${settings.agent || "default"}`, `Project: ${settings.project || "default"}`,
     `Sandbox: ${settings.sandbox ? "enabled" : "disabled"}`, `Output: ${settings.outputFormat}`,
     settings.workspace ? `Workspace: ${settings.workspace}` : null,
     `Add dirs: ${settings.addDirs?.length || 0}`, `Slash commands: ${settings.disableSlashCommands ? "disabled" : "enabled"}`,
     `Auto topic rename: ${settings.autoTopicRename ? "enabled" : "disabled"}`,
   ].filter(Boolean).join("\n");
+}
+
+export function orchestratorPanelHtml(context: AppContext, chatId: ChatId): string {
+  const settings = settingsFor(context, chatId);
+  const plannerDisplay = settings.orchestratorPlanner ? modelLabel(settings.orchestratorPlanner) : "AGY default";
+  const executorDisplay = settings.orchestratorExecutor ? modelLabel(settings.orchestratorExecutor) : "AGY default";
+  return [
+    "🎭 <b>Orchestrator Configuration</b>\n",
+    `• <b>Active Model:</b> <code>${escapeHtml(modelLabel(settings.model))}</code>`,
+    `• <b>Planner:</b> <code>${escapeHtml(plannerDisplay)}</code>`,
+    `• <b>Executor:</b> <code>${escapeHtml(executorDisplay)}</code>\n`,
+    "<i>Tap a Planner/Executor model or effort below — changes apply immediately to this session.</i>",
+  ].join("\n");
 }
 
 export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
@@ -27,7 +41,7 @@ export function sessionInfoHtml(context: AppContext, chatId: ChatId): string {
 
   return [
     "✨ <b>New AGY conversation started.</b>\n",
-    `• <b>Model:</b> <code>${escapeHtml(modelLabel(settings.model))}</code>`,
+    `• <b>Model:</b> <code>${escapeHtml(formatModelDisplay(settings))}</code>`,
     `• <b>Effort:</b> <code>${escapeHtml(settings.effort || "high")}</code>`,
     `• <b>Mode:</b> <code>${escapeHtml(modeStr)}</code>`,
     `• <b>Verbose:</b> <code>${escapeHtml(settings.verbose || "detailed")}</code>`,

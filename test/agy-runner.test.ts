@@ -315,3 +315,71 @@ test("isWaitingResponseText accurately recognizes interim waiting messages", () 
   assert.equal(isWaitingResponseText("Here is the final answer: All tests pass."), false);
   assert.equal(isWaitingResponseText(""), false);
 });
+
+test("runAgy retries once without --effort on effort conflict error and skips retry on unrelated failures", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { runAgy } = await import("../src/agy-runner.js");
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "agy-runner-retry-"));
+  const countFile = path.join(tmpDir, "count.txt");
+  const argsLog = path.join(tmpDir, "args.log");
+  const retryBin = path.join(tmpDir, "mock-retry.sh");
+  const failBin = path.join(tmpDir, "mock-fail.sh");
+  const initLine = JSON.stringify({ event: "init", conversation_id: "conv-retry" });
+  const resultLine = JSON.stringify({ event: "result", result: { conversation_id: "conv-retry", status: "SUCCESS", response: "ok" } });
+
+  await fs.writeFile(
+    retryBin,
+    [
+      "#!/bin/sh",
+      `echo "call" >> "${countFile}"`,
+      `printf '%s\\n' "$@" >> "${argsLog}"`,
+      `echo "---" >> "${argsLog}"`,
+      'for arg in "$@"; do',
+      '  if [ "$arg" = "--effort" ]; then',
+      '    echo "error: invalid model selection (--model \\"\\" --effort \\"high\\"): --effort is not supported for the current model" >&2',
+      "    exit 1",
+      "  fi",
+      "done",
+      `echo '${initLine}'`,
+      `echo '${resultLine}'`,
+    ].join("\n"),
+    { mode: 0o755 }
+  );
+
+  await fs.writeFile(
+    failBin,
+    [
+      "#!/bin/sh",
+      `echo "call" >> "${countFile}"`,
+      'echo "network error" >&2',
+      "exit 1",
+    ].join("\n"),
+    { mode: 0o755 }
+  );
+
+  try {
+    const res = await runAgy({ ...config, bin: retryBin, model: "", effort: "high", workspace: tmpDir }, "hello", null);
+    assert.equal(res.text, "ok");
+    assert.equal(res.conversationId, "conv-retry");
+
+    const calls = (await fs.readFile(countFile, "utf8")).trim().split("\n").filter(Boolean);
+    assert.equal(calls.length, 2, "Should invoke AGY twice (initial + 1 retry without --effort)");
+    const logged = await fs.readFile(argsLog, "utf8");
+    const [firstCall, secondCall] = logged.split("---\n");
+    assert.ok(firstCall.includes("--effort\nhigh\n"), "First call should include --effort high");
+    assert.ok(!secondCall.includes("--effort"), "Retry call should omit --effort");
+
+    await fs.writeFile(countFile, "");
+    await assert.rejects(
+      () => runAgy({ ...config, bin: failBin, model: "", effort: "high", workspace: tmpDir }, "hello", null),
+      /AGY exited with 1: network error/
+    );
+    const failCalls = (await fs.readFile(countFile, "utf8")).trim().split("\n").filter(Boolean);
+    assert.equal(failCalls.length, 1, "Unrelated error must not trigger retry");
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});

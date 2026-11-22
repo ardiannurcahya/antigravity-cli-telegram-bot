@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 const REGISTERED_COMMANDS = [
   "menu", "new", "resume", "usage", "credits", "context", "tokens", "quota",
-  "status", "cancel", "model", "effort", "mode", "sandbox", "verbose", "savedefault", "session",
+  "status", "cancel", "model", "orchestrator", "effort", "mode", "sandbox", "verbose", "savedefault", "session",
   "workspace", "autotopic", "learn", "help", "agents", "agent", "project", "add_dir", "output_format", "json_schema",
   "log_file", "print_timeout", "continue", "new_project", "disable_slash_commands",
   "changelog", "plugins", "skills", "mcp", "cli_help", "version", "update", "restart", "compact", "diff", "title", "rename", "btw", "fork", "branch", "rewind", "undo", "agy", "agy_confirm"
@@ -11,7 +11,7 @@ const REGISTERED_COMMANDS = [
 
 // List of all commands handled in src/index.ts
 const HANDLED_COMMANDS = new Set([
-  "/start", "/menu", "/help", "/new", "/models", "/model", "/effort", "/mode",
+  "/start", "/menu", "/help", "/new", "/models", "/model", "/orchestrator", "/effort", "/mode",
   "/sandbox", "/verbose", "/savedefault", "/setdefault", "/workspace", "/autotopic", "/agent", "/project", "/add-dir", "/output-format", "/json-schema",
   "/log-file", "/print-timeout", "/resume", "/sessions", "/continue",
   "/new-project", "/disable-slash-commands", "/agents", "/changelog",

@@ -14,6 +14,7 @@ import {
   effortKeyboard,
   modeKeyboard,
   modelKeyboard,
+  orchestratorKeyboard,
   outputFormatKeyboard,
   sandboxKeyboard,
   sttKeyboard,
@@ -21,11 +22,11 @@ import {
   verboseKeyboard,
   workspaceKeyboard,
 } from "../ui/inline-keyboards.js";
-import { sessionInfoHtml, sessionOptionUsage, sessionText, usageReport } from "../ui/messages.js";
-import { cliOutput, showMain, showResumeMenu } from "../ui/screens.js";
+import { orchestratorPanelHtml, sessionInfoHtml, sessionOptionUsage, sessionText, usageReport } from "../ui/messages.js";
+import { cliOutput, showMain, showOrchestratorMenu, showResumeMenu } from "../ui/screens.js";
 import { reply, replyWithHtml } from "../ui/reply.js";
 import { enqueueJob } from "../usecases/enqueue.js";
-import { refreshModels, selectModel } from "../usecases/model-selection.js";
+import { refreshModels, selectModel, updateOrchestratorSetting } from "../usecases/model-selection.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { isWhisperInstalled, warmupWhisperLocal } from "../stt/stt-service.js";
@@ -109,6 +110,10 @@ command("/models", "/model")(async ({ context, chatId, args }) => {
     await reply(context, chatId, `Models refreshed (${getActiveModels().length} available).`, modelKeyboard(context, chatId, 0));
     return;
   }
+  if (args[0].toLowerCase() === "orchestrator") {
+    await showOrchestratorMenu(context, chatId);
+    return;
+  }
   const targetModel = args[0].trim();
   const outcome = await selectModel(context, chatId, targetModel);
   if (!outcome) {
@@ -116,6 +121,40 @@ command("/models", "/model")(async ({ context, chatId, args }) => {
     return;
   }
   await replyWithHtml(context, chatId, outcome.text, outcome.defaultOfferKeyboard);
+});
+
+command("/orchestrator")(async ({ context, chatId, args }) => {
+  await refreshModels(context);
+  const sub = args[0]?.toLowerCase().trim();
+  if (!sub) {
+    await showOrchestratorMenu(context, chatId);
+    return;
+  }
+  if (sub === "reset" || sub === "default" || sub === "clear") {
+    const res = await updateOrchestratorSetting(context, chatId, "reset", "default");
+    if (res.error) {
+      await reply(context, chatId, res.error, createMainKeyboard(res.settings));
+      return;
+    }
+    await replyWithHtml(context, chatId, orchestratorPanelHtml(context, chatId), orchestratorKeyboard(context, chatId));
+    return;
+  }
+  if ((sub === "planner" || sub === "executor") && args[1]) {
+    const target = args.slice(1).join(" ").trim();
+    const res = await updateOrchestratorSetting(context, chatId, sub === "planner" ? "p" : "e", target);
+    if (res.error) {
+      await reply(context, chatId, res.error, orchestratorKeyboard(context, chatId));
+      return;
+    }
+    await replyWithHtml(context, chatId, orchestratorPanelHtml(context, chatId), orchestratorKeyboard(context, chatId));
+    return;
+  }
+  await replyWithHtml(
+    context,
+    chatId,
+    `${orchestratorPanelHtml(context, chatId)}\n\n<b>Usage:</b>\n• <code>/orchestrator</code>\n• <code>/orchestrator planner &lt;model-id&gt;</code>\n• <code>/orchestrator executor &lt;model-id&gt;</code>\n• <code>/orchestrator reset</code>`,
+    orchestratorKeyboard(context, chatId)
+  );
 });
 
 command("/effort")(async ({ context, chatId, args }) => {

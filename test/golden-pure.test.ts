@@ -38,15 +38,32 @@ test("golden: buildArgs injects attachment notes and add-dir for image and docum
   assert.ok(docArgs.includes("conv-1"));
 });
 
-test("golden: buildArgs skips effort for claude models and effort-suffixed models", () => {
+test("golden: buildArgs skips effort for claude, orchestrator, and effort-suffixed models", () => {
   const claude = buildArgs({ ...baseConfig }, "go", null, { model: "claude-sonnet-4-6", effort: "low" });
   assert.ok(!claude.includes("--effort"));
   const suffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-3.7-flash-medium", effort: "low" });
   assert.ok(!suffixed.includes("--effort"));
   const xhighSuffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-4-hydrogen-xhigh", effort: "high" });
   assert.ok(!xhighSuffixed.includes("--effort"));
+  const neonXhigh = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-4-neon-xhigh", effort: "high" });
+  assert.ok(!neonXhigh.includes("--effort"));
   const maxSuffixed = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-4-hydrogen-max", effort: "high" });
   assert.ok(!maxSuffixed.includes("--effort"));
+
+  for (const model of [
+    "gemini-pro-orchestrator-neon",
+    "gemini-pro-orchestrator-g1-pro",
+    "gemini-pro-orchestrator",
+    "Orchestrator (Neon)",
+    "Orchestrator: Gemini 4 Neon (XHigh) plans, Gemini 4 Hydrogen (XHigh) executes",
+    "Gemini 4 Hydrogen (XHigh)",
+  ]) {
+    const args = buildArgs({ ...baseConfig }, "go", null, { model, effort: "high" });
+    assert.ok(!args.includes("--effort"), `Expected --effort to be omitted for ${model}`);
+  }
+
+  const bareGemini = buildArgs({ ...baseConfig }, "go", null, { model: "gemini-3.8-flash", effort: "high" });
+  assert.ok(bareGemini.includes("--effort"), "Bare adjustable model should still receive --effort");
 });
 
 test("golden: parseCommandArgs handles quotes, escapes, and rejects unclosed quotes", () => {

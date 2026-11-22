@@ -122,7 +122,7 @@ test("generateTopicShortName parses stream-json output and reports ephemeral con
   }
 });
 
-test("generateTopicShortName does not pass --effort when model name already contains effort suffix", async () => {
+test("generateTopicShortName skips --effort for effort-suffixed, claude, and orchestrator models", async () => {
   const fs = await import("node:fs/promises");
   const os = await import("node:os");
   const path = await import("node:path");
@@ -139,10 +139,18 @@ test("generateTopicShortName does not pass --effort when model name already cont
       telegram: { autoTopicModel: "gemini-3.8-flash-medium" },
       agy: { bin: mockBin, allowDangerouslySkipPermissions: false },
     };
-    const label = await generateTopicShortName(config, "test", "test");
-    assert.equal(label, "📦Test");
-    const captured = (await fs.readFile(recordedArgs, "utf8")).split("\n");
-    assert.ok(!captured.includes("--effort"), "Should not contain --effort flag when model ends in -medium");
+    for (const model of [
+      "gemini-3.8-flash-medium",
+      "gemini-4-hydrogen-xhigh",
+      "gemini-pro-orchestrator-neon",
+      "claude-sonnet-4-6",
+    ]) {
+      config.telegram.autoTopicModel = model;
+      const label = await generateTopicShortName(config, "test", "test");
+      assert.equal(label, "📦Test");
+      const captured = (await fs.readFile(recordedArgs, "utf8")).split("\n");
+      assert.ok(!captured.includes("--effort"), `Should not contain --effort flag for ${model}`);
+    }
 
     // Conversely, test that a model without suffix gets --effort low
     config.telegram.autoTopicModel = "custom-model";

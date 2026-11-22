@@ -39,7 +39,12 @@ export function getAvailableModels(context: Pick<AppContext, "config" | "state">
 export function settingsFor(context: AppContext, chatId: ChatId): SessionSettings {
   const config = context.config;
   const defaults: SessionSettings = {
-    model: config.agy.model || null, effort: config.agy.effort, mode: config.agy.mode, sandbox: config.agy.sandbox,
+    model: config.agy.model || null,
+    effort: config.agy.effort,
+    orchestratorPlanner: config.agy.orchestratorPlanner || null,
+    orchestratorExecutor: config.agy.orchestratorExecutor || null,
+    mode: config.agy.mode,
+    sandbox: config.agy.sandbox,
     menuProfile: config.telegram.menuProfile || "mixed",
     agent: config.agy.agent || null, project: config.agy.project || null, addDirs: [], continueSession: false,
     newProject: false, disableSlashCommands: false, jsonSchema: null, logFile: null, outputFormat: "stream-json",
@@ -55,9 +60,34 @@ export function settingsFor(context: AppContext, chatId: ChatId): SessionSetting
     autoTopicRename: config.telegram.autoTopicRename ?? false,
   };
   const stored = context.state.session(chatId)?.settings || {};
+  const defaultPlanner = defaults.orchestratorPlanner && isModelAllowed(context, defaults.orchestratorPlanner)
+    ? defaults.orchestratorPlanner
+    : null;
+  const defaultExecutor = defaults.orchestratorExecutor && isModelAllowed(context, defaults.orchestratorExecutor)
+    ? defaults.orchestratorExecutor
+    : null;
+  const resolveOrchestratorRole = (hasKey: boolean, raw: unknown, fallback: string | null): string | null => {
+    if (hasKey) {
+      if (raw === null) return null;
+      if (typeof raw === "string" && raw.trim() && isModelAllowed(context, raw.trim())) {
+        return raw.trim();
+      }
+    }
+    return fallback;
+  };
   const settings: SessionSettings = {
     model: typeof stored.model === "string" && isModelAllowed(context, stored.model) ? stored.model : defaults.model,
     effort: typeof stored.effort === "string" && isEffort(stored.effort) ? stored.effort : defaults.effort,
+    orchestratorPlanner: resolveOrchestratorRole(
+      Object.prototype.hasOwnProperty.call(stored, "orchestratorPlanner"),
+      stored.orchestratorPlanner,
+      defaultPlanner
+    ),
+    orchestratorExecutor: resolveOrchestratorRole(
+      Object.prototype.hasOwnProperty.call(stored, "orchestratorExecutor"),
+      stored.orchestratorExecutor,
+      defaultExecutor
+    ),
     mode: typeof stored.mode === "string" && isMode(stored.mode) ? stored.mode : defaults.mode,
     sandbox: typeof stored.sandbox === "boolean" ? stored.sandbox : defaults.sandbox,
     menuProfile: typeof stored.menuProfile === "string" && isMenuProfile(stored.menuProfile) ? stored.menuProfile : defaults.menuProfile,

@@ -1,6 +1,6 @@
 import type { AppContext } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
-import { modelLabel } from "../models.js";
+import { formatModelDisplay } from "../domain/orchestrator.js";
 import type { QueueJob } from "../queue.js";
 import { escapeHtml } from "../telegram.js";
 import { formatStepUpdate, runAgy } from "../agy-runner.js";
@@ -66,7 +66,7 @@ export async function runBtwJob(
 
     progressMessage = await context.telegram.sendMessage(
       job.chatId,
-      `💬 <b>Side question (/btw):</b> thinking... (${escapeHtml(modelLabel(settings.model))})`,
+      `💬 <b>Side question (/btw):</b> thinking... (${escapeHtml(formatModelDisplay(settings))})`,
       undefined,
       "HTML"
     );

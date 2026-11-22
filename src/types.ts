@@ -58,6 +58,8 @@ export type TelemetryPostPromptMode = "inline" | "message" | "separate" | "progr
 export interface SessionSettings {
   model: string | null;
   effort: "low" | "medium" | "high";
+  orchestratorPlanner?: string | null;
+  orchestratorExecutor?: string | null;
   mode: "plan" | "accept-edits";
   sandbox: boolean;
   menuProfile?: MenuProfile;
@@ -168,6 +170,8 @@ export interface AgyConfig {
   allowSandboxDisable: boolean;
   model: string;
   effort: "low" | "medium" | "high";
+  orchestratorPlanner?: string;
+  orchestratorExecutor?: string;
   allowedModels: string[];
   allowedModelsExplicit?: boolean;
   timeoutMs: number;
@@ -258,6 +262,8 @@ export interface RunnerOptions {
   onEvent?: (event: StreamEvent) => void;
   model?: string | null;
   effort?: "low" | "medium" | "high";
+  orchestratorPlanner?: string | null;
+  orchestratorExecutor?: string | null;
   mode?: "plan" | "accept-edits";
   sandbox?: boolean;
   project?: string | null;

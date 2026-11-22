@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { modelSupportsEffortFlag } from "../agy-runner.js";
 import type { AppConfig, SessionSettings } from "../types.js";
 import type { SttService, TranscriptionResult } from "../domain/stt.js";
 
@@ -81,10 +82,11 @@ export class AgySttService implements SttService {
       prompt,
       "--model",
       model,
-      "--effort",
-      "low",
-      "--disable-slash-commands",
     ];
+    if (modelSupportsEffortFlag(model)) {
+      args.push("--effort", "low");
+    }
+    args.push("--disable-slash-commands");
 
     if (this.config.agy.allowDangerouslySkipPermissions) {
       args.push("--dangerously-skip-permissions");

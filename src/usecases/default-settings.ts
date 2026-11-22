@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AppContext } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { button, backKeyboard } from "../ui/inline-keyboards.js";
-import { modelLabel } from "../models.js";
+import { formatModelDisplay } from "../domain/orchestrator.js";
 import { escapeHtml } from "../telegram.js";
 import { settingsFor } from "../domain/settings.js";
 import { replyWithHtml, reply } from "../ui/reply.js";
@@ -26,6 +26,12 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
       AGY_EFFORT: settings.effort || "high",
       AGY_MODE: settings.mode || "accept-edits",
       AGY_SANDBOX: settings.sandbox ? "1" : "0",
+      ...((settings.orchestratorPlanner || lines.some((l) => l.startsWith("AGY_ORCHESTRATOR_PLANNER=")))
+        ? { AGY_ORCHESTRATOR_PLANNER: settings.orchestratorPlanner || "" }
+        : {}),
+      ...((settings.orchestratorExecutor || lines.some((l) => l.startsWith("AGY_ORCHESTRATOR_EXECUTOR=")))
+        ? { AGY_ORCHESTRATOR_EXECUTOR: settings.orchestratorExecutor || "" }
+        : {}),
       ...(settings.sttProvider ? { STT_PROVIDER: settings.sttProvider } : {}),
       ...(settings.sttWhisperModel ? { STT_WHISPER_MODEL: settings.sttWhisperModel } : {}),
       ...(settings.sttAgyModel ? { STT_AGY_MODEL: settings.sttAgyModel } : {}),
@@ -51,6 +57,8 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
 
     context.config.agy.model = settings.model || "";
     context.config.agy.effort = settings.effort;
+    context.config.agy.orchestratorPlanner = settings.orchestratorPlanner || undefined;
+    context.config.agy.orchestratorExecutor = settings.orchestratorExecutor || undefined;
     context.config.agy.mode = settings.mode;
     context.config.agy.sandbox = settings.sandbox;
     if (context.config.stt) {
@@ -71,7 +79,7 @@ export async function persistDefaultSettings(context: AppContext, chatId: ChatId
     const ttsLine = settings.ttsMode ? `\n• <b>TTS:</b> ${escapeHtml(settings.ttsMode)} (${escapeHtml(settings.ttsVoice || "default")})` : "";
     const sttLine = settings.sttProvider ? `\n• <b>STT:</b> ${escapeHtml(settings.sttProvider)} (${escapeHtml(settings.sttLang || "auto")})` : "";
     const autoTopicLine = settings.autoTopicRename !== undefined ? `\n• <b>Auto Topic Rename:</b> ${settings.autoTopicRename ? "On" : "Off"}` : "";
-    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(modelLabel(settings.model))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}${ttsLine}${sttLine}${autoTopicLine}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
+    const text = `💾 <b>Settings saved as permanent defaults:</b>\n\n• <b>Model:</b> ${escapeHtml(formatModelDisplay(settings))}\n• <b>Effort:</b> ${settings.effort}\n• <b>Mode:</b> ${settings.mode === "accept-edits" ? "edit" : "plan"}\n• <b>Sandbox:</b> ${settings.sandbox ? "On" : "Off"}${ttsLine}${sttLine}${autoTopicLine}\n\n<i>These defaults will now apply to all new sessions and service restarts.</i>`;
     if (messageId) {
       await context.telegram.editMessageText(chatId, messageId, text, { inline_keyboard: [[button("‹ Back to Menu", "menu:main")]] }, "HTML");
     } else {

@@ -33,6 +33,8 @@ test("resetSession removes conversation history and resets model/effort while pr
     settings: {
       model: "gemini-3.7-flash-low",
       effort: "low",
+      orchestratorPlanner: "gemini-4-neon-xhigh",
+      orchestratorExecutor: "gemini-4-hydrogen-xhigh",
       verbose: "compact",
       continueSession: true,
       newProject: true,
@@ -43,9 +45,11 @@ test("resetSession removes conversation history and resets model/effort while pr
 
   await state.resetSession("456");
   assert.equal(state.session("456")?.conversationId, undefined);
-  // model and effort should be reset so default applies
+  // model, effort, and orchestrator pairing should be reset so defaults apply
   assert.equal(state.session("456")?.settings?.model, undefined);
   assert.equal(state.session("456")?.settings?.effort, undefined);
+  assert.equal(state.session("456")?.settings?.orchestratorPlanner, undefined);
+  assert.equal(state.session("456")?.settings?.orchestratorExecutor, undefined);
   assert.equal(state.session("456")?.settings?.continueSession, false);
   assert.equal(state.session("456")?.settings?.newProject, false);
   assert.equal(state.session("456")?.settings?.verbose, "compact");
