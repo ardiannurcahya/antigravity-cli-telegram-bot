@@ -188,20 +188,20 @@ export function extractQuota(rawOutput: string, cleaned?: string): QuotaReport {
     if (embeddedEmail) account = embeddedEmail[0];
   }
 
-  const geminiPartMatch = panel.match(
-    /(?:GEMINI\s*MODELS?|Gemini\s+Models?)[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?|GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5)|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
-  );
-  const geminiPart = geminiPartMatch ? geminiPartMatch[0] : "";
+  const geminiHeader = String.raw`(?:GEMINI\s*MODELS?|Gemini\s+Models?)`;
+  const claudeHeader = String.raw`(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)`;
+  const argonHeader = String.raw`(?:GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5))`;
+  const footerStop = String.raw`│\s*Within\s+each\s+group|↑\/↓\s*Scroll`;
 
-  const claudePartMatch = panel.match(
-    /(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?)[\s\S]*?(?=(?:GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5)|GEMINI\s*MODELS?|Gemini\s+Models?|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
-  );
-  const claudePart = claudePartMatch ? claudePartMatch[0] : "";
+  const extractSection = (header: string, otherHeaders: string[]): string => {
+    const stop = `(?:(?:^|\\n)[ \\t]*(?:${otherHeaders.join("|")})[ \\t]*(?:\\r?\\n|$)|${footerStop})`;
+    const re = new RegExp(`(?:^|\\n)[ \\t]*${header}[ \\t]*(?:\\r?\\n|$)[\\s\\S]*?(?=${stop}|$)`, "i");
+    return panel.match(re)?.[0] ?? "";
+  };
 
-  const argonPartMatch = panel.match(
-    /(?:GEMINI\s*4\s*ARGON|Gemini\s+4\s+Argon(?!\s+Weekly|\s+Five|\s+5))[\s\S]*?(?=(?:CLAUDE\s*(?:AND|&|\/)\s*GPT(?:\s*MODELS?)?|Claude\s+Models?|GEMINI\s*MODELS?|Gemini\s+Models?|│\s*Within\s+each\s+group|↑\/↓\s*Scroll)|$)/i
-  );
-  const argonPart = argonPartMatch ? argonPartMatch[0] : "";
+  const geminiPart = extractSection(geminiHeader, [claudeHeader, argonHeader]);
+  const claudePart = extractSection(claudeHeader, [argonHeader, geminiHeader]);
+  const argonPart = extractSection(argonHeader, [claudeHeader, geminiHeader]);
 
   const gemini = extractQuotaLimits(geminiPart);
   const claude = extractQuotaLimits(claudePart);

@@ -113,6 +113,54 @@ accept-edits · Gemini 3.8 Flash · low (Google AI Pro)
   assert.match(html, /• Weekly: 🔴 <b>85\.55%<\/b> \(in 167h 0m\) <i>\[-14%\]<\/i>/);
 });
 
+test("quota: does not misclassify GEMINI MODELS when 'Gemini 4 Argon' appears in group description", () => {
+  const sample = `
+└ Models & Quota
+
+  Account: stephan.bolten@gmail.com
+
+GEMINI MODELS
+  Models within this group: Gemini 4 Neon, Gemini 4 Argon, Gemini 4 Hydrogen, Orchestrator (Neon), Orchestrator (Argon),
+
+  Weekly Limit Remaining
+    [██████████████████████████████████████████████████] 99.75%
+Refreshes in 167h 24m
+
+  Five Hour Limit Remaining
+[██████████████████████████████████████████████████] 99.01%
+Refreshes in 4h 24m
+
+
+CLAUDE AND GPT MODELS
+  Models within this group: Claude Opus 5.5, Claude Sonnet 5.5, GPT-OSS 120B
+
+  Weekly Limit Remaining
+[██████████████████████████████████████████████████] 100.00%
+Quota available
+
+  Five Hour Limit Remaining
+[██████████████████████████████████████████████████] 100.00%
+Quota available
+
+
+  │Within each group, models share a weekly limit and a 5-hour limit.
+  ↑/↓ Scroll · pgup/pgdown Page · ctrl+end Bottom · ctrl+home Top · esc Close
+`;
+
+  const report = extractQuota(sample);
+  assert.equal(report.account, "stephan.bolten@gmail.com");
+  assert.ok(sectionHasLimits(report.gemini));
+  assert.equal(report.gemini.weekly.value, "99.75%");
+  assert.equal(report.gemini.fiveHour.value, "99.01%");
+  assert.ok(sectionHasLimits(report.claude));
+  assert.equal(sectionHasLimits(report.argon), false);
+
+  const html = renderQuota(report);
+  assert.match(html, /<b>Gemini Models<\/b>/);
+  assert.match(html, /<b>Claude & GPT Models<\/b>/);
+  assert.doesNotMatch(html, /<b>Gemini 4 Argon<\/b>/);
+});
+
 // ---------------------------------------------------------------------------
 // Credits
 // ---------------------------------------------------------------------------
