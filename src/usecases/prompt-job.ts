@@ -8,7 +8,7 @@ import { modelLabel, getActiveModels } from "../models.js";
 import type { QueueJob } from "../queue.js";
 import { escapeHtml, findReferencedMediaFiles, formatTelegramHtml } from "../telegram.js";
 import { formatStepUpdate, runAgy } from "../agy-runner.js";
-import { parseContext, parseContextMetrics, parseCredits, parseUsageQuota, parseTokenValue, runPtyCommand } from "../pty-runner.js";
+import { getUsageQuota, parseContext, parseContextMetrics, parseCredits, parseUsageQuota, parseTokenValue, runPtyCommand } from "../pty-runner.js";
 import { settingsFor } from "../domain/settings.js";
 import { addUsage, formatTokenCount } from "../domain/usage-math.js";
 import { buildTelemetryQuoteBlock } from "../domain/telemetry.js";
@@ -42,7 +42,7 @@ interface PtyReportSpec {
 const PTY_REPORTS: Record<PtyReportKind, PtyReportSpec> = {
   usage: {
     ptyCommand: "/usage",
-    startingMessage: "Checking AGY models & quota via PTY...",
+    startingMessage: "Checking AGY models & quota...",
     doneMessage: "Quota check complete.",
     errorPrefix: "Could not read AGY quota:",
     format: parseUsageQuota,
@@ -81,21 +81,30 @@ async function runPtyReportJob(context: AppContext, job: QueueJob & { kind: PtyR
     const effectiveAgyConfig = effectiveWorkspace === context.config.agy.workspace
       ? context.config.agy
       : { ...context.config.agy, workspace: effectiveWorkspace };
-    const output = await runPtyCommand(effectiveAgyConfig, spec.ptyCommand, {
-      conversationId: spec.conversationId?.(session),
-      timeoutMs: 15_000,
-      signal: controller.signal,
-    });
-    if (isCancelled()) return;
-    const formatted = spec.format(output);
-    if (job.kind === "context") {
-      const metrics = parseContextMetrics(output);
-      if (metrics.tokens) {
-        await context.state.setSession(job.chatId, {
-          contextTokens: metrics.tokens,
-          contextPercentage: metrics.percentage,
-        });
-        await refreshActiveMenu(context, job.chatId);
+    let formatted: string;
+    if (job.kind === "usage") {
+      formatted = await getUsageQuota(effectiveAgyConfig, {
+        timeoutMs: 15_000,
+        signal: controller.signal,
+      });
+      if (isCancelled()) return;
+    } else {
+      const output = await runPtyCommand(effectiveAgyConfig, spec.ptyCommand, {
+        conversationId: spec.conversationId?.(session),
+        timeoutMs: 15_000,
+        signal: controller.signal,
+      });
+      if (isCancelled()) return;
+      formatted = spec.format(output);
+      if (job.kind === "context") {
+        const metrics = parseContextMetrics(output);
+        if (metrics.tokens) {
+          await context.state.setSession(job.chatId, {
+            contextTokens: metrics.tokens,
+            contextPercentage: metrics.percentage,
+          });
+          await refreshActiveMenu(context, job.chatId);
+        }
       }
     }
     if (progressMessage) await context.telegram.editMessageText(job.chatId, progressMessage.message_id, spec.doneMessage).catch(() => undefined);
