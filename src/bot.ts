@@ -46,6 +46,7 @@ const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: "status", description: "Show current job status" },
   { command: "cancel", description: "Cancel the active or queued job" },
   { command: "model", description: "Show or choose the model" },
+  { command: "orchestrator", description: "Configure Orchestrator planner & executor" },
   { command: "effort", description: "Show or change reasoning effort" },
   { command: "mode", description: "Show or change plan/edit mode" },
   { command: "sandbox", description: "Show or change sandbox mode" },

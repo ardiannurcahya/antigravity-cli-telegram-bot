@@ -245,3 +245,44 @@ test("handleUpdate notifies user if whisper-local is configured but whisper bina
   }
 });
 
+test("AgySttService.transcribe only passes --effort low for models supporting --effort", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "agy-stt-effort-"));
+  const mockBin = path.join(tmpDir, "mock-agy.sh");
+  const recordedArgs = path.join(tmpDir, "args.txt");
+  const audioFile = path.join(tmpDir, "sample.ogg");
+  await fs.writeFile(audioFile, "dummy-audio");
+  await fs.writeFile(
+    mockBin,
+    `#!/bin/sh\nprintf '%s\\n' "$@" > "${recordedArgs}"\necho "hello world"\n`,
+    { mode: 0o755 }
+  );
+  try {
+    for (const model of ["gemini-3.8-flash-low", "gemini-4-hydrogen-xhigh", "gemini-pro-orchestrator-neon"]) {
+      const cfg = mockConfig();
+      cfg.agy.bin = mockBin;
+      cfg.stt.agyModel = model;
+      const service = new AgySttService(cfg);
+      const res = await service.transcribe(audioFile);
+      assert.equal(res.text, "hello world");
+      const captured = (await fs.readFile(recordedArgs, "utf8")).split("\n");
+      assert.ok(!captured.includes("--effort"), `Should omit --effort for ${model}`);
+    }
+
+    const cfgCustom = mockConfig();
+    cfgCustom.agy.bin = mockBin;
+    cfgCustom.stt.agyModel = "custom-model";
+    const serviceCustom = new AgySttService(cfgCustom);
+    const resCustom = await serviceCustom.transcribe(audioFile);
+    assert.equal(resCustom.text, "hello world");
+    const capturedCustom = (await fs.readFile(recordedArgs, "utf8")).split("\n");
+    const effortIdx = capturedCustom.indexOf("--effort");
+    assert.ok(effortIdx >= 0, "Should pass --effort for custom-model");
+    assert.equal(capturedCustom[effortIdx + 1], "low");
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+

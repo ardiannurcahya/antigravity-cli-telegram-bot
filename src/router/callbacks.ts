@@ -12,17 +12,18 @@ import {
   cliToolsKeyboard,
   menuProfileKeyboard,
   modeSandboxKeyboard,
+  orchestratorKeyboard,
   sttKeyboard,
   ttsKeyboard,
   verboseKeyboard,
 } from "../ui/inline-keyboards.js";
 import { cliOutput, CLI_COMMANDS, showCliOption, showMain, showMenu, showResumeMenu, type CliCommand } from "../ui/screens.js";
-import { sessionInfoHtml } from "../ui/messages.js";
+import { orchestratorPanelHtml, sessionInfoHtml } from "../ui/messages.js";
 import { enqueueJob } from "../usecases/enqueue.js";
 import { runCustomAgy } from "../usecases/custom-agy.js";
 import { persistDefaultSettings } from "../usecases/default-settings.js";
 import { updateBot } from "../usecases/self-update.js";
-import { selectModel } from "../usecases/model-selection.js";
+import { selectModel, updateOrchestratorSetting, type OrchestratorUpdateAction } from "../usecases/model-selection.js";
 import { cleanupSessionTempFiles } from "../usecases/session-cleanup.js";
 import { resetForumTopicNameIfAutoRenamed } from "../usecases/topic-reset.js";
 import { handleForkCommand } from "../usecases/fork-command.js";
@@ -190,6 +191,17 @@ async function applySettingChange(context: AppContext, chatId: import("../types.
     const outcome = await selectModel(context, chatId, value);
     if (outcome) {
       await context.telegram.editMessageText(chatId, messageId, outcome.text, outcome.defaultOfferKeyboard, "HTML");
+      return;
+    }
+  }
+  if (key.startsWith("orch:")) {
+    const action = key.slice("orch:".length);
+    if (action === "pf" || action === "pe" || action === "ef" || action === "ee" || action === "reset") {
+      const result = await updateOrchestratorSetting(context, chatId, action as OrchestratorUpdateAction, value);
+      const html = result.error
+        ? `${orchestratorPanelHtml(context, chatId)}\n\n⚠️ ${escapeHtml(result.error)}`
+        : orchestratorPanelHtml(context, chatId);
+      await context.telegram.editMessageText(chatId, messageId, html, orchestratorKeyboard(context, chatId), "HTML").catch(() => undefined);
       return;
     }
   }

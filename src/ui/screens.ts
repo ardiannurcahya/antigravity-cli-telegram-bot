@@ -12,6 +12,7 @@ import {
   modeKeyboard,
   modeSandboxKeyboard,
   modelKeyboard,
+  orchestratorKeyboard,
   outputFormatKeyboard,
   resumeKeyboard,
   sandboxKeyboard,
@@ -27,10 +28,10 @@ import {
   voiceSettingsKeyboard,
   workspaceKeyboard,
 } from "./inline-keyboards.js";
-import { resumeMessageText, sessionText, settingsText } from "./messages.js";
+import { orchestratorPanelHtml, resumeMessageText, sessionText, settingsText } from "./messages.js";
 import { reply, replyWithHtml } from "./reply.js";
 import { enqueueJob } from "../usecases/enqueue.js";
-import { refreshModels } from "../usecases/model-selection.js";
+import { activateOrchestrator, refreshModels } from "../usecases/model-selection.js";
 import { handleSkillsCommand } from "../usecases/skills-command.js";
 import { handleMcpCommand } from "../usecases/mcp-command.js";
 import { settingsFor } from "../domain/settings.js";
@@ -145,9 +146,31 @@ export async function showCliOption(context: AppContext, chatId: ChatId, message
   await context.telegram.editMessageText(chatId, messageId, `Use this custom command:\n\n${examples[option] || "/agy --help"}`, backKeyboard());
 }
 
+export async function showOrchestratorMenu(context: AppContext, chatId: ChatId, messageId?: number): Promise<void> {
+  await refreshModels(context);
+  const activated = await activateOrchestrator(context, chatId);
+  if (!activated) {
+    const msg = "Orchestrator is not allowed by AGY_ALLOWED_MODELS.";
+    if (messageId) {
+      await context.telegram.editMessageText(chatId, messageId, msg, backKeyboard()).catch(() => undefined);
+    } else {
+      await reply(context, chatId, msg, createMainKeyboard(settingsFor(context, chatId)));
+    }
+    return;
+  }
+  const html = orchestratorPanelHtml(context, chatId);
+  const keyboard = orchestratorKeyboard(context, chatId);
+  if (messageId) {
+    await context.telegram.editMessageText(chatId, messageId, html, keyboard, "HTML").catch(() => undefined);
+  } else {
+    await replyWithHtml(context, chatId, html, keyboard);
+  }
+}
+
 export async function showMenu(context: AppContext, chatId: ChatId, messageId: number, kind: string, page = 0): Promise<void> {
   if (kind === "main") return showMain(context, chatId, messageId);
   await context.state.setSession(chatId, { activeMenuScreen: kind });
+  if (kind === "orchestrator") return showOrchestratorMenu(context, chatId, messageId);
   if (kind === "model" || kind === "models") {
     await refreshModels(context);
     return context.telegram.editMessageText(chatId, messageId, "Select a model:", modelKeyboard(context, chatId, page));

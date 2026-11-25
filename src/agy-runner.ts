@@ -2,11 +2,41 @@ import { spawn } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { childEnvironment } from "./infra/safe-env.js";
+import { modelLabel } from "./models.js";
+import { buildOrchestratorCliSettings } from "./domain/orchestrator.js";
 import type { AgyConfig, AgyResult, RunnerOptions, StreamEvent, Usage } from "./types.js";
 
 const CONVERSATION_KEYS = new Set(["conversationId", "conversation_id", "conversationID", "sessionId", "session_id"]);
 
+/** Returns true when passing `--effort` is compatible with the given model identifier or label. */
+export function modelSupportsEffortFlag(model: string): boolean {
+  const trimmed = model.trim();
+  if (!trimmed) return true;
+  const hasEffortSuffix = /-(low|medium|high|xhigh|max)$/i.test(trimmed);
+  const hasEffortLabelSuffix = /\((low|medium|high|xhigh|extra|max)\)$/i.test(trimmed);
+  const isClaude = /claude/i.test(trimmed);
+  const isOrchestrator = /orchestrator/i.test(trimmed);
+  return !hasEffortSuffix && !hasEffortLabelSuffix && !isClaude && !isOrchestrator;
+}
+
+/** Returns true when an AGY CLI error indicates `--effort` was rejected for the active model. */
+export function isEffortConflictError(message: string): boolean {
+  return /--effort\s+is not supported|conflicts with\s+--effort/i.test(message);
+}
+
+class AgyExitError extends Error {}
+
 export function buildArgs(config: AgyConfig, prompt: string, conversationId: string | null, overrides: RunnerOptions = {}): string[] {
+  return buildArgsInternal(config, prompt, conversationId, overrides, false);
+}
+
+function buildArgsInternal(
+  config: AgyConfig,
+  prompt: string,
+  conversationId: string | null,
+  overrides: RunnerOptions = {},
+  omitEffort = false
+): string[] {
   const effective = { ...config, ...overrides };
   const outputFormat = effective.outputFormat || "stream-json";
   const allImagePaths = [
@@ -59,13 +89,20 @@ export function buildArgs(config: AgyConfig, prompt: string, conversationId: str
   if (effective.mode) args.push("--mode", effective.mode);
   if (effective.model) {
     args.push("--model", effective.model);
-    const modelHasEffort = /-(low|medium|high|xhigh|max)$/i.test(effective.model);
-    const isClaude = /claude/i.test(effective.model);
-    if (!modelHasEffort && !isClaude && effective.effort) {
+    if (!omitEffort && modelSupportsEffortFlag(effective.model) && effective.effort) {
       args.push("--effort", effective.effort);
     }
-  } else if (effective.effort) {
+  } else if (!omitEffort && effective.effort) {
     args.push("--effort", effective.effort);
+  }
+  const orchestratorSettings = buildOrchestratorCliSettings(
+    effective.model,
+    effective.orchestratorPlanner,
+    effective.orchestratorExecutor,
+    (id) => modelLabel(id)
+  );
+  if (orchestratorSettings) {
+    args.push("--settings", orchestratorSettings);
   }
   if (effective.agent) args.push("--agent", effective.agent);
   const dirs = new Set(effective.addDirs || []);
@@ -476,11 +513,41 @@ export function formatStepUpdate(stepUpdate: Record<string, unknown> | undefined
   return null;
 }
 
-export function runAgy(config: AgyConfig, prompt: string, conversationId: string | null, options: RunnerOptions = {}): Promise<AgyResult> {
+export async function runAgy(config: AgyConfig, prompt: string, conversationId: string | null, options: RunnerOptions = {}): Promise<AgyResult> {
+  const { signal, onEvent, ...overrides } = options;
+  const outputFormat = overrides.outputFormat || "stream-json";
+  const initialArgs = buildArgsInternal(config, prompt, conversationId, { ...overrides, outputFormat }, false);
+  const fallbackArgs = buildArgsInternal(config, prompt, conversationId, { ...overrides, outputFormat }, true);
+  const canRetryWithoutEffort = fallbackArgs.length < initialArgs.length;
+
+  try {
+    return await runAgyWithArgs(config, initialArgs, outputFormat, { signal, onEvent });
+  } catch (error) {
+    if (
+      canRetryWithoutEffort &&
+      !signal?.aborted &&
+      error instanceof AgyExitError &&
+      isEffortConflictError(error.message)
+    ) {
+      return await runAgyWithArgs(config, fallbackArgs, outputFormat, { signal, onEvent });
+    }
+    throw error;
+  }
+}
+
+function runAgyWithArgs(
+  config: AgyConfig,
+  args: string[],
+  outputFormat: string,
+  options: { signal?: AbortSignal; onEvent?: (event: StreamEvent) => void }
+): Promise<AgyResult> {
   return new Promise((resolve, reject) => {
-    const { signal, onEvent, ...overrides } = options;
-    const outputFormat = overrides.outputFormat || "stream-json";
-    const child = spawn(config.bin, buildArgs(config, prompt, conversationId, { ...overrides, outputFormat }), {
+    const { signal, onEvent } = options;
+    if (signal?.aborted) {
+      reject(new Error("AGY job cancelled"));
+      return;
+    }
+    const child = spawn(config.bin, args, {
       cwd: config.workspace, env: childEnvironment(), detached: true, stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = ""; let stderr = ""; let pendingLine = ""; let bytes = 0;
@@ -558,7 +625,7 @@ export function runAgy(config: AgyConfig, prompt: string, conversationId: string
       if (outputLimited) return finish(reject as (value: never) => void, new Error(`AGY output exceeded ${config.maxOutputBytes} bytes`) as never);
       if (code !== 0) {
         const detail = stderr.trim().replace(/\s+/g, " ").slice(0, 1000);
-        return finish(reject as (value: never) => void, new Error(`AGY exited with ${code ?? signalName}${detail ? `: ${detail}` : ""}`) as never);
+        return finish(reject as (value: never) => void, new AgyExitError(`AGY exited with ${code ?? signalName}${detail ? `: ${detail}` : ""}`) as never);
       }
       if (callbackError) return finish(reject as (value: never) => void, callbackError as never);
       const result = outputFormat === "stream-json" ? parseStreamOutput(stdout) : parseJsonOutput(stdout);

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { parseStreamOutput } from "../agy-runner.js";
+import { modelSupportsEffortFlag, parseStreamOutput } from "../agy-runner.js";
 import { childEnvironment } from "../infra/safe-env.js";
 import { parseChatTarget } from "../telegram/client.js";
 import type { AppConfig, ChatId } from "../types.js";
@@ -90,7 +90,7 @@ export async function generateTopicShortName(
     "--disable-slash-commands",
   ];
 
-  if (!/-(low|medium|high)$/.test(model)) {
+  if (modelSupportsEffortFlag(model)) {
     args.push("--effort", "low");
   }
 

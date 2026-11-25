@@ -23,10 +23,29 @@ export async function writeRestartNotice(context: AppContext, notice: Omit<{ cha
   await fs.writeFile(restartNoticePath(context), JSON.stringify({ ...notice, timestamp: Date.now() })).catch(() => undefined);
 }
 
+/** Returns ordered `systemctl` argument lists (primary then fallback) for restarting the bot service. */
+export function restartCommandsForPlatform(isRoot = process.getuid?.() === 0): string[][] {
+  return isRoot
+    ? [["restart", "agy-telegram.service"], ["--user", "restart", "agy-telegram.service"]]
+    : [["--user", "restart", "agy-telegram.service"], ["restart", "agy-telegram.service"]];
+}
+
 export function scheduleServiceRestart(delayMs: number): void {
   if (process.platform === "linux") {
     setTimeout(() => {
-      spawn("systemctl", ["--user", "restart", "agy-telegram.service"], { detached: true, stdio: "ignore" }).unref();
+      const [primary, fallback] = restartCommandsForPlatform();
+      let fallbackTriggered = false;
+      const triggerFallback = (): void => {
+        if (fallbackTriggered || !fallback) return;
+        fallbackTriggered = true;
+        spawn("systemctl", fallback, { detached: true, stdio: "ignore" }).unref();
+      };
+      const child = spawn("systemctl", primary, { detached: true, stdio: "ignore" });
+      child.once("error", triggerFallback);
+      child.once("close", (code) => {
+        if (code !== 0) triggerFallback();
+      });
+      child.unref();
     }, delayMs);
   }
 }

@@ -5,6 +5,7 @@ import type { AppContext } from "../context.js";
 import { controllerKey } from "../context.js";
 import { createMainKeyboard } from "../keyboards.js";
 import { modelLabel, getActiveModels } from "../models.js";
+import { formatModelDisplay, isOrchestratorModel } from "../domain/orchestrator.js";
 import type { QueueJob } from "../queue.js";
 import { escapeHtml, findReferencedMediaFiles, formatTelegramHtml } from "../telegram.js";
 import { formatStepUpdate, runAgy } from "../agy-runner.js";
@@ -164,7 +165,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
     wsNotice = isCustomWorkspace ? `📁 <b>Workspace:</b> <code>${escapeHtml(settings.workspace!)}</code>\n` : "";
     progressMessage = await context.telegram.sendMessage(
       job.chatId,
-      `${wsNotice}⏳ AGY is starting... (${modelLabel(settings.model)})`,
+      `${wsNotice}⏳ AGY is starting... (${formatModelDisplay(settings)})`,
       undefined,
       "HTML"
     );
@@ -222,7 +223,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       if (verbose === "compact") {
         const latestStep = recentSteps.length > 0 ? recentSteps[recentSteps.length - 1] : "";
         const compactStatus = latestStep ? ` · ${latestStep}` : "";
-        pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${modelLabel(settings.model)}${compactStatus})`;
+        pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${formatModelDisplay(settings)}${compactStatus})`;
         void flushProgress();
         return;
       }
@@ -241,7 +242,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
       } else {
         body = "\n\n🚀 Starting AGY session...";
       }
-      pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${modelLabel(settings.model)})${body}`;
+      pendingEditContent = `${wsNotice}⏳ AGY is working... (${elapsed}s · ${formatModelDisplay(settings)})${body}`;
 
       void flushProgress();
     };
@@ -471,13 +472,17 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
         ).catch(() => undefined);
       } else {
         const mode = context.config.telegram.progressMode || "full";
+        const resolvedCompletedModel = result.model || settings.model;
+        const completedModelDisplay = isOrchestratorModel(resolvedCompletedModel)
+          ? formatModelDisplay({ ...settings, model: resolvedCompletedModel })
+          : modelLabel(resolvedCompletedModel);
         if (mode === "compact") {
           const duration = ((result.durationMs || Date.now() - startedAt) / 1000).toFixed(1);
           const tokens = result.usage?.total_tokens ? ` · ${result.usage.total_tokens.toLocaleString()} tok` : "";
           await context.telegram.editMessageText(
             job.chatId,
             progressMessage.message_id,
-            `${wsNotice}⚡ ${duration}s${tokens} · ${modelLabel(result.model || settings.model)}`,
+            `${wsNotice}⚡ ${duration}s${tokens} · ${completedModelDisplay}`,
             undefined,
             "HTML"
           ).catch(() => undefined);
@@ -487,7 +492,7 @@ export async function runPromptJob(context: AppContext, job: QueueJob, isCancell
           await context.telegram.editMessageText(
             job.chatId,
             progressMessage.message_id,
-            `${wsNotice}AGY completed in ${duration}s.\nModel: ${modelLabel(result.model || settings.model)}\n${usageBlock}`,
+            `${wsNotice}AGY completed in ${duration}s.\nModel: ${completedModelDisplay}\n${usageBlock}`,
             undefined,
             "HTML"
           ).catch(() => undefined);

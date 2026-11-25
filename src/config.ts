@@ -27,6 +27,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const allowedModels = modelsFrom(env);
   const model = (env.AGY_MODEL || "").trim();
   if (model && !allowedModels.includes(model)) throw new Error(`AGY_MODEL is not in AGY_ALLOWED_MODELS: ${model}`);
+  const orchestratorPlanner = (env.AGY_ORCHESTRATOR_PLANNER || "").trim() || undefined;
+  const orchestratorExecutor = (env.AGY_ORCHESTRATOR_EXECUTOR || "").trim() || undefined;
   const projectsRootRaw = env.AGY_PROJECTS_ROOT?.trim();
   const projectsRoot = projectsRootRaw ? path.resolve(projectsRootRaw) : path.dirname(workspace);
   const dbPath = resolveEffectiveDbPath(env.AGY_DB_PATH);
@@ -49,7 +51,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     agy: {
       bin: (env.AGY_BIN || "/root/.local/bin/agy").trim(), workspace, project: (env.AGY_PROJECT || "").trim(), mode,
       sandbox: booleanFrom(env, "AGY_SANDBOX", false), allowSandboxDisable: booleanFrom(env, "AGY_ALLOW_SANDBOX_DISABLE", true),
-      model, effort, allowedModels, allowedModelsExplicit, timeoutMs: positiveIntegerFrom(env, "AGY_TIMEOUT_MS", 1_800_000),
+      model, effort, orchestratorPlanner, orchestratorExecutor, allowedModels, allowedModelsExplicit, timeoutMs: positiveIntegerFrom(env, "AGY_TIMEOUT_MS", 1_800_000),
       maxOutputBytes: positiveIntegerFrom(env, "AGY_MAX_OUTPUT_BYTES", 20_000_000),
       agent: (env.AGY_AGENT || "").trim() || undefined,
       allowDangerouslySkipPermissions: booleanFrom(env, "AGY_ALLOW_DANGEROUSLY_SKIP_PERMISSIONS", false),

@@ -645,6 +645,18 @@ test("bot self-update and restart stay disabled unless explicitly allowed", asyn
   }
 });
 
+test("restartCommandsForPlatform prioritizes system restart for root and user restart otherwise", async () => {
+  const { restartCommandsForPlatform } = await import("../src/usecases/self-update.js");
+  assert.deepEqual(restartCommandsForPlatform(true), [
+    ["restart", "agy-telegram.service"],
+    ["--user", "restart", "agy-telegram.service"],
+  ]);
+  assert.deepEqual(restartCommandsForPlatform(false), [
+    ["--user", "restart", "agy-telegram.service"],
+    ["restart", "agy-telegram.service"],
+  ]);
+});
+
 test("/help streams CLI help through a fresh loading message", async () => {
   const harness = createHarness();
   const ctx = asAppContext(harness);
