@@ -314,6 +314,14 @@ function formatDurationFromMs(diffMs: number): string {
   return `${mins}m`;
 }
 
+function formatResetRefresh(resetTime?: string): string | null {
+  if (!resetTime) return null;
+  const ms = new Date(resetTime).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const diffMs = ms - Date.now();
+  return diffMs > 0 ? formatDurationFromMs(diffMs) : null;
+}
+
 interface QuotaBucketJson {
   id: string;
   name: string;
@@ -343,16 +351,34 @@ export async function getUsageQuotaDirect(config: AgyConfig, options: PtyRunnerO
 
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      child.kill("SIGKILL");
+      reject(new Error("Command cancelled"));
+    };
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       child.kill("SIGKILL");
       reject(new Error(`Direct quota command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
     child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
 
     child.on("close", (code) => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      cleanup();
       if (code !== 0 && !stdout.trim()) {
         return reject(new Error(`Direct quota failed (exit code ${code}): ${stderr.trim()}`));
       }
@@ -377,15 +403,14 @@ export async function getUsageQuotaDirect(config: AgyConfig, options: PtyRunnerO
             const isWeekly = b.window === "weekly" || b.id.includes("weekly");
             const label = isWeekly ? "Weekly" : "5-Hour";
             const windowMins = isWeekly ? WEEKLY_WINDOW_MINUTES : FIVE_HOUR_WINDOW_MINUTES;
+            const refreshStr = formatResetRefresh(b.reset_time);
 
             if (b.disabled) {
-              const refreshStr = b.reset_time ? formatDurationFromMs(new Date(b.reset_time).getTime() - Date.now()) : null;
               const formattedLine = formatQuotaLimitLine(label, "Disabled", refreshStr, windowMins);
               if (formattedLine) lines.push(formattedLine);
             } else {
               const frac = typeof b.remaining_fraction === "number" ? b.remaining_fraction : 1;
-              const pctStr = `${Math.round(frac * 100)}%`;
-              const refreshStr = b.reset_time ? formatDurationFromMs(new Date(b.reset_time).getTime() - Date.now()) : null;
+              const pctStr = `${Number((frac * 100).toFixed(2))}%`;
               const formattedLine = formatQuotaLimitLine(label, pctStr, refreshStr, windowMins);
               if (formattedLine) lines.push(formattedLine);
             }
@@ -399,7 +424,9 @@ export async function getUsageQuotaDirect(config: AgyConfig, options: PtyRunnerO
     });
 
     child.on("error", (err) => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      cleanup();
       reject(err);
     });
   });
